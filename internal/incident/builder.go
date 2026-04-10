@@ -1,6 +1,9 @@
 package incident
 
-import v1 "k8s.io/api/core/v1"
+import (
+	"github.com/google/uuid"
+	v1 "k8s.io/api/core/v1"
+)
 
 // BuildFromPod constructs an IncidentReport from a given Pod,
 // extracting its metadata, phase, and detected container issues.
@@ -20,10 +23,13 @@ func BuildFromPod(pod *v1.Pod, containerIssues []ContainerIssue, logs []string) 
 	}
 
 	return IncidentReport{
-		PodName:         pod.Name,
-		Namespace:       pod.Namespace,
-		Phase:           pod.Status.Phase,
-		Reason:          reason,
+		EventID: uuid.NewString(),
+
+		PodName:   pod.Name,
+		Namespace: pod.Namespace,
+		Phase:     pod.Status.Phase,
+		Reason:    reason,
+
 		ContainerIssues: containerIssues,
 		Logs:            logs,
 	}
