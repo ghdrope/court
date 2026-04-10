@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 
+	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/inspector"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
@@ -11,13 +12,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// PodReconciler watches Pod objects and detects unhealthy transitions.
+// PodReconciler reconciles Pod resources and detects failure conditions,
+// producing IncidentReports for unhealthy pods.
 type PodReconciler struct {
 	client.Client
 	Log logr.Logger
 }
 
-// Reconcile runs whenever a Pod event occurs.
+// Reconcile is triggered on Pod events and evaluates the current Pod state.
+// When a failure condition or container issue is detected, it builds an
+// incidentReport representing the observed problem.
 func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	logger := r.Log.WithValues(
@@ -27,20 +31,32 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	var pod v1.Pod
 
-	// Fetch latest Pod state
+	// Fetch the latest state of the Pod from the API server.
 	if err := r.Get(ctx, req.NamespacedName, &pod); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	currentPhase := pod.Status.Phase
+	// Inspect container-level issues such as CrashLoopBackOff or OOMKilled.
+	containerIssues := inspector.DetectContainerIssues(&pod)
 
-	// Detect transition: Running -> Failure
-	if currentPhase == v1.PodFailed || currentPhase == v1.PodUnknown {
-		logger.Info("pod in failure state", "phase", currentPhase)
+	// Determine if the Pod is in a failure state or has container-level issues.
+	if pod.Status.Phase == v1.PodFailed ||
+		pod.Status.Phase == v1.PodUnknown ||
+		len(containerIssues) > 0 {
+
+		// Build a structured incident report from the Pod state.
+		report := incident.BuildFromPod(
+			&pod,
+			containerIssues,
+			[]string{}, // logs later (TBD)
+		)
+
+		logger.Info("incident created",
+			"pod", report.PodName,
+			"namespace", report.Namespace,
+			"phase", report.Phase,
+		)
 	}
-
-	// Detect container-level failures
-	inspector.DetectContainerIssues(logger, &pod)
 
 	return ctrl.Result{}, nil
 }
