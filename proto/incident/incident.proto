@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package incident;
+
+option go_package = "github.com/ghdrope/court/proto/incidentpb";
+
+// ContainerIssue represents a failure or abnormal state detected
+// in a specific container within a Pod.
+message ContainerIssue {
+  string container = 1;
+  string reason = 2;
+}
+
+// IncidentReport describes a detected Pod failure event produced by the Officer.
+// It contains metadata about the Pod, its current state, and any container-level issues.
+message IncidentReport {
+  string event_id = 1;
+  string pod_name = 2;
+  string namespace = 3;
+  string phase = 4;
+  string reason = 5;
+
+  // container_issues lists detected runtime issues for containers in the Pod.
+  repeated ContainerIssue container_issues = 6;
+
+  // logs contains a limited snapshot of relevant Pod logs.
+  repeated string logs = 7;
+}
+
+// Ack represents a simple acknowledgment response returned by the API server.
+// It indicates whether the incident was successfully received and forwarded.
+message Ack {
+  string status = 1;
+}
+
+// IncidentService defines the gRPC API for reporting incidents.
+// It acts as the entry point for Officer components to send IncidentReports
+// into the system for routing and further processing.
+service IncidentService {
+
+  // ReportIncident receives an IncidentReport from the Officer
+  // and forwards it to the appropriate downstream service.
+  rpc ReportIncident(IncidentReport) returns (Ack);
+}
