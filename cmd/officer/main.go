@@ -18,7 +18,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync()
+	}()
 
 	ctrl.SetLogger(ctrlzap.New(ctrlzap.UseDevMode(false)))
 
