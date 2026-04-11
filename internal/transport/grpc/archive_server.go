@@ -22,8 +22,8 @@ func (s *ArchiveServer) StoreIncident(
 ) (*pb.StoreIncidentResponse, error) {
 
 	log.Printf(
-		"storing incident event_id=%s pod=%s/%s",
-		req.EventId,
+		"storing incident id=%s pod=%s/%s",
+		req.Id,
 		req.Namespace,
 		req.PodName,
 	)
@@ -33,6 +33,6 @@ func (s *ArchiveServer) StoreIncident(
 	}
 
 	return &pb.StoreIncidentResponse{
-		Status: "stored",
+		Success: true,
 	}, nil
 }

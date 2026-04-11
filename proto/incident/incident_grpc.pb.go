@@ -8,7 +8,6 @@ package incidentpb
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -32,7 +31,7 @@ const (
 // into the system for routing and further processing.
 type IncidentServiceClient interface {
 	// ReportIncident receives an IncidentReport from the Officer
-	// and forwards it to the appropriate downstream service.
+	// and triggers downstream processing.
 	ReportIncident(ctx context.Context, in *IncidentReport, opts ...grpc.CallOption) (*Ack, error)
 }
 
@@ -63,7 +62,7 @@ func (c *incidentServiceClient) ReportIncident(ctx context.Context, in *Incident
 // into the system for routing and further processing.
 type IncidentServiceServer interface {
 	// ReportIncident receives an IncidentReport from the Officer
-	// and forwards it to the appropriate downstream service.
+	// and triggers downstream processing.
 	ReportIncident(context.Context, *IncidentReport) (*Ack, error)
 	mustEmbedUnimplementedIncidentServiceServer()
 }

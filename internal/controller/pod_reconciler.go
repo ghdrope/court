@@ -53,14 +53,18 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	// Build a structured incident report from the Pod state.
-	report := incident.BuildFromPod(
+	report, err := incident.BuildFromPod(
 		&pod,
 		containerIssues,
-		[]string{}, // logs later (TBD)
+		[]string{}, // logs later (TBD
 	)
+	if err != nil {
+		logger.Error(err, "failed to build incident report")
+		return ctrl.Result{}, err
+	}
 
 	pbReport := &pb.IncidentReport{
-		EventId:   report.EventID,
+		Id:        report.ID,
 		PodName:   report.PodName,
 		Namespace: report.Namespace,
 		Phase:     string(report.Phase),
@@ -68,7 +72,14 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		Logs:      report.Logs,
 	}
 
-	logger.Info("sending incident", "event_id", report.EventID)
+	for _, ci := range report.ContainerIssues {
+		pbReport.ContainerIssues = append(pbReport.ContainerIssues, &pb.ContainerIssue{
+			Container: ci.Container,
+			Reason:    ci.Reason,
+		})
+	}
+
+	logger.Info("sending incident", "id", report.ID)
 
 	if err := r.API.Send(ctx, pbReport); err != nil {
 		logger.Error(err, "failed to send incident")

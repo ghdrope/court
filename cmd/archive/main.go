@@ -20,6 +20,8 @@ func main() {
 		_ = logger.Sync()
 	}()
 
+	zap.ReplaceGlobals(logger)
+
 	if err := Execute(ctx); err != nil {
 		zap.L().Error("fatal error", zap.Error(err))
 		os.Exit(1)

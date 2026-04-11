@@ -12,27 +12,32 @@ import (
 // Does not perform logging and is intended solely as an inspection utility.
 func DetectContainerIssues(pod *v1.Pod) []incident.ContainerIssue {
 
-	var issues []incident.ContainerIssue
+	if pod == nil {
+		return nil
+	}
+
+	issues := make([]incident.ContainerIssue, 0, len(pod.Status.ContainerStatuses))
 
 	for _, cs := range pod.Status.ContainerStatuses {
 
+		add := func(reason string) {
+			issues = append(issues, incident.ContainerIssue{
+				Container: cs.Name,
+				Reason:    reason,
+			})
+		}
+
 		// Detect containers stuck in waiting states due to runtime issues.
 		if cs.State.Waiting != nil {
-			switch cs.State.Waiting.Reason {
+			switch reason := cs.State.Waiting.Reason; reason {
 			case "CrashLoopBackOff", "ImagePullBackOff":
-				issues = append(issues, incident.ContainerIssue{
-					Container: cs.Name,
-					Reason:    cs.State.Waiting.Reason,
-				})
+				add(reason)
 			}
 		}
 
 		// Detect containers terminated due to out-of-memory conditions.
 		if cs.State.Terminated != nil && cs.State.Terminated.Reason == "OOMKilled" {
-			issues = append(issues, incident.ContainerIssue{
-				Container: cs.Name,
-				Reason:    "OOMKilled",
-			})
+			add(cs.State.Terminated.Reason)
 		}
 	}
 

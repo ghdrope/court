@@ -14,7 +14,7 @@ message ContainerIssue {
 // IncidentReport describes a detected Pod failure event produced by the Officer.
 // It contains metadata about the Pod, its current state, and any container-level issues.
 message IncidentReport {
-  string event_id = 1;
+  string id = 1;
   string pod_name = 2;
   string namespace = 3;
   string phase = 4;
@@ -30,7 +30,7 @@ message IncidentReport {
 // Ack represents a simple acknowledgment response returned by the API server.
 // It indicates whether the incident was successfully received and forwarded.
 message Ack {
-  string status = 1;
+  bool success = 1;
 }
 
 // IncidentService defines the gRPC API for reporting incidents.
@@ -39,6 +39,6 @@ message Ack {
 service IncidentService {
 
   // ReportIncident receives an IncidentReport from the Officer
-  // and forwards it to the appropriate downstream service.
+  // and triggers downstream processing.
   rpc ReportIncident(IncidentReport) returns (Ack);
 }

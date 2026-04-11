@@ -16,7 +16,6 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 // newPatrolCommand starts the k8s controller.
@@ -30,8 +29,6 @@ func newPatrolCommand() *cobra.Command {
 
 		RunE: func(cmd *cobra.Command, _ []string) error {
 
-			ctrl.SetLogger(ctrlzap.New())
-
 			logger := ctrl.Log.WithName("officer")
 			logger.Info("starting patrol controller")
 
@@ -41,10 +38,13 @@ func newPatrolCommand() *cobra.Command {
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 			)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to connect to API server: %w", err)
 			}
+
 			defer func() {
-				_ = conn.Close()
+				if err = conn.Close(); err != nil {
+					logger.Error(err, "failed to close gRPC connection")
+				}
 			}()
 
 			apiClient := router.NewAPIClient(conn)

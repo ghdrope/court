@@ -8,6 +8,7 @@ import (
 	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.uber.org/zap"
 
 	"github.com/ghdrope/court/internal/archive"
 	grpcserver "github.com/ghdrope/court/internal/transport/grpc"
@@ -16,7 +17,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// newArchiveCommand starts the archive.
+// newServeCommand starts the archive.
 func newServeCommand() *cobra.Command {
 
 	var port string
@@ -30,7 +31,7 @@ func newServeCommand() *cobra.Command {
 
 			lis, err := net.Listen("tcp", ":"+port)
 			if err != nil {
-				return err
+				return fmt.Errorf("listen: %w", err)
 			}
 
 			dsn := os.Getenv("DATABASE_URL")
@@ -40,18 +41,20 @@ func newServeCommand() *cobra.Command {
 
 			db, err := sql.Open("pgx", dsn)
 			if err != nil {
-				return err
+				return fmt.Errorf("open database: %w", err)
 			}
 			defer func() {
-				_ = db.Close()
+				if err := db.Close(); err != nil {
+					zap.L().Error("failed to close db", zap.Error(err))
+				}
 			}()
 
 			if err := db.Ping(); err != nil {
-				return err
+				return fmt.Errorf("ping database: %w", err)
 			}
 
 			if err := archive.InitSchema(ctx, db); err != nil {
-				return fmt.Errorf("failed to init schema: %w", err)
+				return fmt.Errorf("init schema: %w", err)
 			}
 
 			repo := archive.NewPostgresRepository(db)
@@ -62,17 +65,17 @@ func newServeCommand() *cobra.Command {
 				Repo: repo,
 			})
 
-			log.Printf("archive service running on :%s", port)
+			zap.L().Info("archive service running", zap.String("port", port))
 
 			go func() {
 				if err := grpcServer.Serve(lis); err != nil {
-					log.Printf("grpc error: %v", err)
+					zap.L().Error("grpc server error", zap.Error(err))
 				}
 			}()
 
 			<-ctx.Done()
 
-			log.Println("shutting down Archive server...")
+			log.Println("shutting down Archive server")
 			grpcServer.GracefulStop()
 
 			return nil

@@ -56,7 +56,7 @@ clean-build: ## Clean build artifacts, caches, and reports
 
 # ==== Security ====
 .PHONY: check-vulnerability
-check-vulnerability:
+check-vulnerability: ## Run Go vulnerability check
 	@echo "[TASK] Running vulnerability check"
 	@mkdir -p "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)"
 	@REPORT="$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)"; \
@@ -71,7 +71,7 @@ check-vulnerability:
 	fi
 
 .PHONY: check-cicd-vulnerability
-check-cicd-vulnerability:
+check-cicd-vulnerability: ## Run CI images vulnerability check
 	@echo "[TASK] Scanning CI Docker images for vulnerabilities"
 	@command -v trivy >/dev/null 2>&1 || { echo "❌ trivy is not installed"; exit 1; }
 

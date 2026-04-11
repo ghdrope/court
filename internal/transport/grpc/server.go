@@ -14,7 +14,7 @@ type Server struct {
 	Router Router
 }
 
-// Router defines where to forward incidents
+// Router defines where to forward incidents.
 type Router interface {
 	Route(ctx context.Context, report *pb.IncidentReport) error
 }
@@ -22,11 +22,15 @@ type Router interface {
 // ReportIncident receives an incident and forwards it.
 func (s *Server) ReportIncident(ctx context.Context, report *pb.IncidentReport) (*pb.Ack, error) {
 
-	log.Printf("received incident: %s/%s", report.Namespace, report.PodName)
+	log.Printf("received incident: %s/%s id=%s",
+		report.Namespace,
+		report.PodName,
+		report.Id,
+	)
 
 	if err := s.Router.Route(ctx, report); err != nil {
 		return nil, err
 	}
 
-	return &pb.Ack{Status: "ok"}, nil
+	return &pb.Ack{Success: true}, nil
 }

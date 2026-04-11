@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	pb "github.com/ghdrope/court/proto/archive"
@@ -30,6 +31,10 @@ func (r *PostgresRepository) Store(
 	req *pb.StoreIncidentRequest,
 ) error {
 
+	if req == nil {
+		return fmt.Errorf("store incident: request is nil")
+	}
+
 	containerIssues := req.ContainerIssues
 	if containerIssues == nil {
 		containerIssues = []*pb.ContainerIssue{}
@@ -37,7 +42,7 @@ func (r *PostgresRepository) Store(
 
 	ciJSON, err := json.Marshal(containerIssues)
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal container issues: %w", err)
 	}
 
 	logs := req.Logs
@@ -61,7 +66,7 @@ func (r *PostgresRepository) Store(
 	res, err := r.DB.ExecContext(
 		ctx,
 		query,
-		req.EventId,
+		req.Id,
 		req.PodName,
 		req.Namespace,
 		req.Phase,
@@ -70,11 +75,15 @@ func (r *PostgresRepository) Store(
 		logs,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("insert incident: %w", err)
 	}
 
-	rows, _ := res.RowsAffected()
-	log.Printf("ROWS INSERTED = %d", rows)
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	}
 
-	return err
+	log.Printf("incident stored id=%s rows=%d", req.Id, rows)
+
+	return nil
 }

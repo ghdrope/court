@@ -21,18 +21,20 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// StoreIncidentRequest contains a full incident report payload
+// StoreIncidentRequest contains a full incident report payload.
 type StoreIncidentRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	EventId         string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
-	PodName         string                 `protobuf:"bytes,2,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
-	Namespace       string                 `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Phase           string                 `protobuf:"bytes,4,opt,name=phase,proto3" json:"phase,omitempty"`
-	Reason          string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
-	ContainerIssues []*ContainerIssue      `protobuf:"bytes,6,rep,name=container_issues,json=containerIssues,proto3" json:"container_issues,omitempty"`
-	Logs            []string               `protobuf:"bytes,7,rep,name=logs,proto3" json:"logs,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PodName   string                 `protobuf:"bytes,2,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
+	Namespace string                 `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Phase     string                 `protobuf:"bytes,4,opt,name=phase,proto3" json:"phase,omitempty"`
+	Reason    string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	// container_issues lists detected runtime issues for containers in the Pod.
+	ContainerIssues []*ContainerIssue `protobuf:"bytes,6,rep,name=container_issues,json=containerIssues,proto3" json:"container_issues,omitempty"`
+	// logs contains a limited snapshot of relevant Pod logs.
+	Logs          []string `protobuf:"bytes,7,rep,name=logs,proto3" json:"logs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StoreIncidentRequest) Reset() {
@@ -65,9 +67,9 @@ func (*StoreIncidentRequest) Descriptor() ([]byte, []int) {
 	return file_proto_archive_archive_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *StoreIncidentRequest) GetEventId() string {
+func (x *StoreIncidentRequest) GetId() string {
 	if x != nil {
-		return x.EventId
+		return x.Id
 	}
 	return ""
 }
@@ -114,7 +116,7 @@ func (x *StoreIncidentRequest) GetLogs() []string {
 	return nil
 }
 
-// ContainerIssue represents container-level failure details
+// ContainerIssue represents container-level failure details.
 type ContainerIssue struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Container     string                 `protobuf:"bytes,1,opt,name=container,proto3" json:"container,omitempty"`
@@ -167,9 +169,11 @@ func (x *ContainerIssue) GetReason() string {
 	return ""
 }
 
+// StoreIncidentReport represents the result of a StoreIncident operation.
+// It indicates whether the incident was successfully persisted.
 type StoreIncidentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -204,11 +208,11 @@ func (*StoreIncidentResponse) Descriptor() ([]byte, []int) {
 	return file_proto_archive_archive_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *StoreIncidentResponse) GetStatus() string {
+func (x *StoreIncidentResponse) GetSuccess() bool {
 	if x != nil {
-		return x.Status
+		return x.Success
 	}
-	return ""
+	return false
 }
 
 var File_proto_archive_archive_proto protoreflect.FileDescriptor
@@ -216,9 +220,9 @@ var File_proto_archive_archive_proto protoreflect.FileDescriptor
 const file_proto_archive_archive_proto_rawDesc = "" +
 	"\n" +
 	"\x1bproto/archive/archive.proto\x12\n" +
-	"archive.v1\"\xf3\x01\n" +
-	"\x14StoreIncidentRequest\x12\x19\n" +
-	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x19\n" +
+	"archive.v1\"\xe8\x01\n" +
+	"\x14StoreIncidentRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bpod_name\x18\x02 \x01(\tR\apodName\x12\x1c\n" +
 	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12\x14\n" +
 	"\x05phase\x18\x04 \x01(\tR\x05phase\x12\x16\n" +
@@ -227,9 +231,9 @@ const file_proto_archive_archive_proto_rawDesc = "" +
 	"\x04logs\x18\a \x03(\tR\x04logs\"F\n" +
 	"\x0eContainerIssue\x12\x1c\n" +
 	"\tcontainer\x18\x01 \x01(\tR\tcontainer\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"/\n" +
-	"\x15StoreIncidentResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status2f\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"1\n" +
+	"\x15StoreIncidentResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2f\n" +
 	"\x0eArchiveService\x12T\n" +
 	"\rStoreIncident\x12 .archive.v1.StoreIncidentRequest\x1a!.archive.v1.StoreIncidentResponseB2Z0github.com/ghdrope/court/proto/archive;archivepbb\x06proto3"
 

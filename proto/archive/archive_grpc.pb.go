@@ -28,6 +28,8 @@ const (
 //
 // ArchiveService is responsible for persisting incident reports
 type ArchiveServiceClient interface {
+	// StoreIncident persists a full incident report in the archive storage.
+	// It is typically called by upstream services after receiving an incident.
 	StoreIncident(ctx context.Context, in *StoreIncidentRequest, opts ...grpc.CallOption) (*StoreIncidentResponse, error)
 }
 
@@ -55,6 +57,8 @@ func (c *archiveServiceClient) StoreIncident(ctx context.Context, in *StoreIncid
 //
 // ArchiveService is responsible for persisting incident reports
 type ArchiveServiceServer interface {
+	// StoreIncident persists a full incident report in the archive storage.
+	// It is typically called by upstream services after receiving an incident.
 	StoreIncident(context.Context, *StoreIncidentRequest) (*StoreIncidentResponse, error)
 	mustEmbedUnimplementedArchiveServiceServer()
 }

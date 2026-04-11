@@ -79,7 +79,7 @@ func (x *ContainerIssue) GetReason() string {
 // It contains metadata about the Pod, its current state, and any container-level issues.
 type IncidentReport struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
-	EventId   string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	PodName   string                 `protobuf:"bytes,2,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
 	Namespace string                 `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	Phase     string                 `protobuf:"bytes,4,opt,name=phase,proto3" json:"phase,omitempty"`
@@ -122,9 +122,9 @@ func (*IncidentReport) Descriptor() ([]byte, []int) {
 	return file_proto_incident_incident_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *IncidentReport) GetEventId() string {
+func (x *IncidentReport) GetId() string {
 	if x != nil {
-		return x.EventId
+		return x.Id
 	}
 	return ""
 }
@@ -175,7 +175,7 @@ func (x *IncidentReport) GetLogs() []string {
 // It indicates whether the incident was successfully received and forwarded.
 type Ack struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -210,11 +210,11 @@ func (*Ack) Descriptor() ([]byte, []int) {
 	return file_proto_incident_incident_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *Ack) GetStatus() string {
+func (x *Ack) GetSuccess() bool {
 	if x != nil {
-		return x.Status
+		return x.Success
 	}
-	return ""
+	return false
 }
 
 var File_proto_incident_incident_proto protoreflect.FileDescriptor
@@ -224,17 +224,17 @@ const file_proto_incident_incident_proto_rawDesc = "" +
 	"\x1dproto/incident/incident.proto\x12\bincident\"F\n" +
 	"\x0eContainerIssue\x12\x1c\n" +
 	"\tcontainer\x18\x01 \x01(\tR\tcontainer\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xeb\x01\n" +
-	"\x0eIncidentReport\x12\x19\n" +
-	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x19\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xe0\x01\n" +
+	"\x0eIncidentReport\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
 	"\bpod_name\x18\x02 \x01(\tR\apodName\x12\x1c\n" +
 	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12\x14\n" +
 	"\x05phase\x18\x04 \x01(\tR\x05phase\x12\x16\n" +
 	"\x06reason\x18\x05 \x01(\tR\x06reason\x12C\n" +
 	"\x10container_issues\x18\x06 \x03(\v2\x18.incident.ContainerIssueR\x0fcontainerIssues\x12\x12\n" +
-	"\x04logs\x18\a \x03(\tR\x04logs\"\x1d\n" +
-	"\x03Ack\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status2L\n" +
+	"\x04logs\x18\a \x03(\tR\x04logs\"\x1f\n" +
+	"\x03Ack\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2L\n" +
 	"\x0fIncidentService\x129\n" +
 	"\x0eReportIncident\x12\x18.incident.IncidentReport\x1a\r.incident.AckB+Z)github.com/ghdrope/court/proto/incidentpbb\x06proto3"
 

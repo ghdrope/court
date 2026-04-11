@@ -22,6 +22,10 @@ func main() {
 		_ = logger.Sync()
 	}()
 
+	// set global zap logger
+	zap.ReplaceGlobals(logger)
+
+	// set controller-runtime logger
 	ctrl.SetLogger(ctrlzap.New(ctrlzap.UseDevMode(false)))
 
 	// Execute CLI

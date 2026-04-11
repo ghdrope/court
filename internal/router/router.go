@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	archivepb "github.com/ghdrope/court/proto/archive"
@@ -18,13 +19,21 @@ type ArchiveClient interface {
 	Store(ctx context.Context, req *archivepb.StoreIncidentRequest) error
 }
 
-// Route convers and forwards the incident to Archive.
+// Route converts and forwards the incident to Archive.
 func (r *Router) Route(ctx context.Context, report *pb.IncidentReport) error {
 
-	log.Printf("routing incident to archive: %s", report.EventId)
+	if report == nil {
+		return fmt.Errorf("incident report is nil")
+	}
+
+	log.Printf("routing incident id=%s pod=%s/%s",
+		report.Id,
+		report.Namespace,
+		report.PodName,
+	)
 
 	req := &archivepb.StoreIncidentRequest{
-		EventId:   report.EventId,
+		Id:        report.Id,
 		PodName:   report.PodName,
 		Namespace: report.Namespace,
 		Phase:     report.Phase,
@@ -32,7 +41,8 @@ func (r *Router) Route(ctx context.Context, report *pb.IncidentReport) error {
 		Logs:      report.Logs,
 	}
 
-	// map container issues
+	req.ContainerIssues = make([]*archivepb.ContainerIssue, 0, len(report.ContainerIssues))
+
 	for _, ci := range report.ContainerIssues {
 		req.ContainerIssues = append(req.ContainerIssues, &archivepb.ContainerIssue{
 			Container: ci.Container,

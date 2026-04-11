@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 
@@ -8,6 +9,7 @@ import (
 	grpcserver "github.com/ghdrope/court/internal/transport/grpc"
 	pb "github.com/ghdrope/court/proto/incident"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -27,10 +29,8 @@ func newServeCommand() *cobra.Command {
 
 			lis, err := net.Listen("tcp", ":"+port)
 			if err != nil {
-				return err
+				return fmt.Errorf("listen: %w", err)
 			}
-
-			grpcServer := grpc.NewServer()
 
 			// connect to Archive service
 			conn, err := grpc.NewClient(
@@ -38,10 +38,12 @@ func newServeCommand() *cobra.Command {
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 			)
 			if err != nil {
-				return err
+				return fmt.Errorf("connect archive: %w", err)
 			}
 			defer func() {
-				_ = conn.Close()
+				if err := conn.Close(); err != nil {
+					zap.L().Error("failed to close gRPC connection", zap.Error(err))
+				}
 			}()
 
 			archiveClient := router.NewGRPCArchiveClient(conn)
@@ -54,19 +56,21 @@ func newServeCommand() *cobra.Command {
 				Router: r,
 			}
 
+			grpcServer := grpc.NewServer()
+
 			pb.RegisterIncidentServiceServer(grpcServer, s)
 
-			log.Printf("API server listening on :%s", port)
+			zap.L().Info("API server listening", zap.String("port", port))
 
 			go func() {
 				if err := grpcServer.Serve(lis); err != nil {
-					log.Printf("grpc error: %v", err)
+					zap.L().Error("grpc server error", zap.Error(err))
 				}
 			}()
 
 			<-ctx.Done()
 
-			log.Println("shutting down API server...")
+			log.Println("shutting down API server")
 			grpcServer.GracefulStop()
 
 			return nil
