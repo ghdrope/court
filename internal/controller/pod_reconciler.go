@@ -5,10 +5,12 @@ import (
 
 	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/inspector"
+	"github.com/ghdrope/court/internal/router"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	pb "github.com/ghdrope/court/proto/incident"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -17,6 +19,8 @@ import (
 type PodReconciler struct {
 	client.Client
 	Log logr.Logger
+
+	API *router.APIClient
 }
 
 // Reconcile is triggered on Pod events and evaluates the current Pod state.
@@ -39,23 +43,36 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	// Inspect container-level issues such as CrashLoopBackOff or OOMKilled.
 	containerIssues := inspector.DetectContainerIssues(&pod)
 
-	// Determine if the Pod is in a failure state or has container-level issues.
-	if pod.Status.Phase == v1.PodFailed ||
-		pod.Status.Phase == v1.PodUnknown ||
-		len(containerIssues) > 0 {
+	isProblem :=
+		pod.Status.Phase == v1.PodFailed ||
+			pod.Status.Phase == v1.PodUnknown ||
+			len(containerIssues) > 0
 
-		// Build a structured incident report from the Pod state.
-		report := incident.BuildFromPod(
-			&pod,
-			containerIssues,
-			[]string{}, // logs later (TBD)
-		)
+	if !isProblem {
+		return ctrl.Result{}, nil
+	}
 
-		logger.Info("incident created",
-			"pod", report.PodName,
-			"namespace", report.Namespace,
-			"phase", report.Phase,
-		)
+	// Build a structured incident report from the Pod state.
+	report := incident.BuildFromPod(
+		&pod,
+		containerIssues,
+		[]string{}, // logs later (TBD)
+	)
+
+	pbReport := &pb.IncidentReport{
+		EventId:   report.EventID,
+		PodName:   report.PodName,
+		Namespace: report.Namespace,
+		Phase:     string(report.Phase),
+		Reason:    report.Reason,
+		Logs:      report.Logs,
+	}
+
+	logger.Info("sending incident", "event_id", report.EventID)
+
+	if err := r.API.Send(ctx, pbReport); err != nil {
+		logger.Error(err, "failed to send incident")
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil

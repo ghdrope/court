@@ -30,7 +30,7 @@ func newServeCommand() *cobra.Command {
 
 			lis, err := net.Listen("tcp", ":"+port)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 
 			dsn := os.Getenv("DATABASE_URL")
@@ -48,6 +48,10 @@ func newServeCommand() *cobra.Command {
 
 			if err := db.Ping(); err != nil {
 				return err
+			}
+
+			if err := archive.InitSchema(ctx, db); err != nil {
+				return fmt.Errorf("failed to init schema: %w", err)
 			}
 
 			repo := archive.NewPostgresRepository(db)
@@ -71,7 +75,7 @@ func newServeCommand() *cobra.Command {
 			log.Println("shutting down Archive server...")
 			grpcServer.GracefulStop()
 
-			return err
+			return nil
 		},
 	}
 
