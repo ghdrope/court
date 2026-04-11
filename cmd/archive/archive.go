@@ -2,9 +2,12 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net"
 	"os"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/ghdrope/court/internal/archive"
 	grpcserver "github.com/ghdrope/court/internal/transport/grpc"
@@ -14,12 +17,12 @@ import (
 )
 
 // newArchiveCommand starts the archive.
-func newArchiveCommand() *cobra.Command {
+func newServeCommand() *cobra.Command {
 
 	var port string
 
 	cmd := &cobra.Command{
-		Use:   "archive",
+		Use:   "serve",
 		Short: "Start gRPC Archive server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -30,13 +33,22 @@ func newArchiveCommand() *cobra.Command {
 				log.Fatal(err)
 			}
 
-			db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+			dsn := os.Getenv("DATABASE_URL")
+			if dsn == "" {
+				return fmt.Errorf("DATABASE_URL is not set")
+			}
+
+			db, err := sql.Open("pgx", dsn)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			defer func() {
 				_ = db.Close()
 			}()
+
+			if err := db.Ping(); err != nil {
+				return err
+			}
 
 			repo := archive.NewPostgresRepository(db)
 
