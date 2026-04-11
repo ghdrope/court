@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package archive.v1;
+
+option go_package = "github.com/ghdrope/court/proto/archive;archivepb";
+
+// ArchiveService is responsible for persisting incident reports
+service ArchiveService {
+  rpc StoreIncident(StoreIncidentRequest) returns (StoreIncidentResponse);
+}
+
+// StoreIncidentRequest contains a full incident report payload
+message StoreIncidentRequest {
+  string event_id = 1;
+  string pod_name = 2;
+  string namespace = 3;
+  string phase = 4;
+  string reason = 5;
+
+  repeated ContainerIssue container_issues = 6;
+  repeated string logs = 7;
+}
+
+// ContainerIssue represents container-level failure details
+message ContainerIssue {
+  string container = 1;
+  string reason = 2;
+}
+
+message StoreIncidentResponse {
+  string status = 1;
+}
