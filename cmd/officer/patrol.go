@@ -4,7 +4,10 @@ import (
 	"fmt"
 
 	"github.com/ghdrope/court/internal/controller"
+	"github.com/ghdrope/court/internal/router"
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,7 +22,9 @@ import (
 // newPatrolCommand starts the k8s controller.
 func newPatrolCommand() *cobra.Command {
 
-	return &cobra.Command{
+	var apiAddr string
+
+	cmd := &cobra.Command{
 		Use:  "patrol",
 		Args: cobra.NoArgs,
 
@@ -29,6 +34,20 @@ func newPatrolCommand() *cobra.Command {
 
 			logger := ctrl.Log.WithName("officer")
 			logger.Info("starting patrol controller")
+
+			// connect to API server
+			conn, err := grpc.NewClient(
+				apiAddr,
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = conn.Close()
+			}()
+
+			apiClient := router.NewAPIClient(conn)
 
 			// Register Kubernetes API scheme
 			scheme := runtime.NewScheme()
@@ -49,6 +68,7 @@ func newPatrolCommand() *cobra.Command {
 			reconciler := &controller.PodReconciler{
 				Client: mgr.GetClient(),
 				Log:    log.Log.WithName("reconciler"),
+				API:    apiClient,
 			}
 
 			// Register Pod controller with manager
@@ -63,4 +83,8 @@ func newPatrolCommand() *cobra.Command {
 			return mgr.Start(cmd.Context())
 		},
 	}
+
+	cmd.Flags().StringVar(&apiAddr, "api-addr", "localhost:50051", "API server gRPC address")
+
+	return cmd
 }

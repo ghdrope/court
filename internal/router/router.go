@@ -4,23 +4,41 @@ import (
 	"context"
 	"log"
 
+	archivepb "github.com/ghdrope/court/proto/archive"
 	pb "github.com/ghdrope/court/proto/incident"
 )
 
-// Router is a simple routing implementation.
+// Router forwards incidents to Archive service.
 type Router struct {
-	CourtClient CourtClient
+	ArchiveClient ArchiveClient
 }
 
-// CourtClient defines downstream Court communication.
-type CourtClient interface {
-	Send(ctx context.Context, report *pb.IncidentReport) error
+// ArchiveClient defines communication with Archive service.
+type ArchiveClient interface {
+	Store(ctx context.Context, req *archivepb.StoreIncidentRequest) error
 }
 
-// Route forwards the incident to the appropriate service.
+// Route convers and forwards the incident to Archive.
 func (r *Router) Route(ctx context.Context, report *pb.IncidentReport) error {
 
-	log.Printf("routing incident to court: %s", report.EventId)
+	log.Printf("routing incident to archive: %s", report.EventId)
 
-	return r.CourtClient.Send(ctx, report)
+	req := &archivepb.StoreIncidentRequest{
+		EventId:   report.EventId,
+		PodName:   report.PodName,
+		Namespace: report.Namespace,
+		Phase:     report.Phase,
+		Reason:    report.Reason,
+		Logs:      report.Logs,
+	}
+
+	// map container issues
+	for _, ci := range report.ContainerIssues {
+		req.ContainerIssues = append(req.ContainerIssues, &archivepb.ContainerIssue{
+			Container: ci.Container,
+			Reason:    ci.Reason,
+		})
+	}
+
+	return r.ArchiveClient.Store(ctx, req)
 }

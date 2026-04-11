@@ -9,12 +9,14 @@ import (
 	pb "github.com/ghdrope/court/proto/incident"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // newServeCommand starts the stateless gRPC API server.
 func newServeCommand() *cobra.Command {
 
 	var port string
+	var archiveAddr string
 
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -30,8 +32,22 @@ func newServeCommand() *cobra.Command {
 
 			grpcServer := grpc.NewServer()
 
+			// connect to Archive service
+			conn, err := grpc.NewClient(
+				archiveAddr,
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+			)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = conn.Close()
+			}()
+
+			archiveClient := router.NewGRPCArchiveClient(conn)
+
 			r := &router.Router{
-				CourtClient: &router.MockCourtClient{},
+				ArchiveClient: archiveClient,
 			}
 
 			s := &grpcserver.Server{
@@ -58,6 +74,7 @@ func newServeCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&port, "port", "50051", "gRPC port")
+	cmd.Flags().StringVar(&archiveAddr, "archive-addr", "localhost:50052", "Archive gRPC address")
 
 	return cmd
 }

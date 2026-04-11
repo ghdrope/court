@@ -3,6 +3,8 @@ package archive
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"log"
 
 	pb "github.com/ghdrope/court/proto/archive"
 )
@@ -28,6 +30,21 @@ func (r *PostgresRepository) Store(
 	req *pb.StoreIncidentRequest,
 ) error {
 
+	containerIssues := req.ContainerIssues
+	if containerIssues == nil {
+		containerIssues = []*pb.ContainerIssue{}
+	}
+
+	ciJSON, err := json.Marshal(containerIssues)
+	if err != nil {
+		return err
+	}
+
+	logs := req.Logs
+	if logs == nil {
+		logs = []string{}
+	}
+
 	query := `
 		INSERT INTO incidents (
 			event_id,
@@ -41,7 +58,7 @@ func (r *PostgresRepository) Store(
 		VALUES ($1,$2,$3,$4,$5,$6,$7)
 	`
 
-	_, err := r.DB.ExecContext(
+	res, err := r.DB.ExecContext(
 		ctx,
 		query,
 		req.EventId,
@@ -49,9 +66,15 @@ func (r *PostgresRepository) Store(
 		req.Namespace,
 		req.Phase,
 		req.Reason,
-		req.ContainerIssues,
-		req.Logs,
+		ciJSON,
+		logs,
 	)
+	if err != nil {
+		return err
+	}
+
+	rows, _ := res.RowsAffected()
+	log.Printf("ROWS INSERTED = %d", rows)
 
 	return err
 }

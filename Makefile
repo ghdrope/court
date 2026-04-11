@@ -56,16 +56,18 @@ clean-build: ## Clean build artifacts, caches, and reports
 
 # ==== Security ====
 .PHONY: check-vulnerability
-check-vulnerability: ## Run vulnerability check on project
-	@echo "[TASK] Running vulnerability check JSON scan"
+check-vulnerability:
+	@echo "[TASK] Running vulnerability check"
 	@mkdir -p "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)"
-	go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... > "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)"
-	@if [ -s "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)" ] && grep -q '"finding"' "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)"; then \
+	@REPORT="$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)"; \
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./... > $$REPORT; \
+	\
+	if grep -q '"finding"' $$REPORT; then \
 		echo "❌ Vulnerabilities found:"; \
-		jq -r 'select(.finding != null) | .finding as $$f | $$f.trace[] | "Package: \(.module) ~> Fixed version: \($$f.fixed_version)"' "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)" | sort -u; \
+		jq -r 'select(.finding != null) | .finding.osv' $$REPORT; \
 		exit 1; \
 	else \
-		echo "✅ No known vulnerabilities found"; \
+		echo "✅ No vulnerabilities found"; \
 	fi
 
 .PHONY: check-cicd-vulnerability
