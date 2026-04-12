@@ -20,7 +20,7 @@ type PodReconciler struct {
 	client.Client
 	Log logr.Logger
 
-	API *router.APIClient
+	API router.IncidentSender
 }
 
 // Reconcile is triggered on Pod events and evaluates the current Pod state.
