@@ -8,6 +8,7 @@ import (
 	"log"
 
 	pb "github.com/ghdrope/court/proto/archive"
+	"github.com/lib/pq"
 )
 
 // Repository defines persistence operations for incidents.
@@ -45,9 +46,9 @@ func (r *PostgresRepository) Store(
 		return fmt.Errorf("marshal container issues: %w", err)
 	}
 
-	logs := req.Logs
-	if logs == nil {
-		logs = []string{}
+	logs := pq.StringArray(req.Logs)
+	if req.Logs == nil {
+		logs = pq.StringArray{}
 	}
 
 	query := `

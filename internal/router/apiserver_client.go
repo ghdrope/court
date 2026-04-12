@@ -7,6 +7,11 @@ import (
 	"google.golang.org/grpc"
 )
 
+// IncidentSender defines how incidents are sent to an external system.
+type IncidentSender interface {
+	Send(ctx context.Context, report *pb.IncidentReport) error
+}
+
 // APIClient sends incidents to API server.
 type APIClient struct {
 	client pb.IncidentServiceClient
