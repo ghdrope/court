@@ -19,113 +19,115 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IncidentService_ReportIncident_FullMethodName = "/incident.IncidentService/ReportIncident"
+	ArchiveService_ReceiveStoreIncident_FullMethodName = "/incident.ArchiveService/ReceiveStoreIncident"
 )
 
-// IncidentServiceClient is the client API for IncidentService service.
+// ArchiveServiceClient is the client API for ArchiveService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// IncidentService defines the gRPC API for reporting incidents.
-// It acts as the entry point for Officer components to send IncidentReports
-// into the system for routing and further processing.
-type IncidentServiceClient interface {
-	// ReportIncident receives an IncidentReport from the Officer
-	// and triggers downstream processing.
-	ReportIncident(ctx context.Context, in *IncidentReport, opts ...grpc.CallOption) (*Ack, error)
+// ArchiveService is the ingestion endpoint for IncidentReports.
+//
+// It receives incidents directly from the Officer component and is responsible
+// for persistence, indexing, and downstream processing.
+type ArchiveServiceClient interface {
+	// ReceiveStoreIncident receives a fully-formed IncidentReport from the Officer
+	// and persists it into the Archive system.
+	ReceiveStoreIncident(ctx context.Context, in *IncidentReport, opts ...grpc.CallOption) (*Ack, error)
 }
 
-type incidentServiceClient struct {
+type archiveServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewIncidentServiceClient(cc grpc.ClientConnInterface) IncidentServiceClient {
-	return &incidentServiceClient{cc}
+func NewArchiveServiceClient(cc grpc.ClientConnInterface) ArchiveServiceClient {
+	return &archiveServiceClient{cc}
 }
 
-func (c *incidentServiceClient) ReportIncident(ctx context.Context, in *IncidentReport, opts ...grpc.CallOption) (*Ack, error) {
+func (c *archiveServiceClient) ReceiveStoreIncident(ctx context.Context, in *IncidentReport, opts ...grpc.CallOption) (*Ack, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Ack)
-	err := c.cc.Invoke(ctx, IncidentService_ReportIncident_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ArchiveService_ReceiveStoreIncident_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// IncidentServiceServer is the server API for IncidentService service.
-// All implementations must embed UnimplementedIncidentServiceServer
+// ArchiveServiceServer is the server API for ArchiveService service.
+// All implementations must embed UnimplementedArchiveServiceServer
 // for forward compatibility.
 //
-// IncidentService defines the gRPC API for reporting incidents.
-// It acts as the entry point for Officer components to send IncidentReports
-// into the system for routing and further processing.
-type IncidentServiceServer interface {
-	// ReportIncident receives an IncidentReport from the Officer
-	// and triggers downstream processing.
-	ReportIncident(context.Context, *IncidentReport) (*Ack, error)
-	mustEmbedUnimplementedIncidentServiceServer()
+// ArchiveService is the ingestion endpoint for IncidentReports.
+//
+// It receives incidents directly from the Officer component and is responsible
+// for persistence, indexing, and downstream processing.
+type ArchiveServiceServer interface {
+	// ReceiveStoreIncident receives a fully-formed IncidentReport from the Officer
+	// and persists it into the Archive system.
+	ReceiveStoreIncident(context.Context, *IncidentReport) (*Ack, error)
+	mustEmbedUnimplementedArchiveServiceServer()
 }
 
-// UnimplementedIncidentServiceServer must be embedded to have
+// UnimplementedArchiveServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedIncidentServiceServer struct{}
+type UnimplementedArchiveServiceServer struct{}
 
-func (UnimplementedIncidentServiceServer) ReportIncident(context.Context, *IncidentReport) (*Ack, error) {
-	return nil, status.Error(codes.Unimplemented, "method ReportIncident not implemented")
+func (UnimplementedArchiveServiceServer) ReceiveStoreIncident(context.Context, *IncidentReport) (*Ack, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReceiveStoreIncident not implemented")
 }
-func (UnimplementedIncidentServiceServer) mustEmbedUnimplementedIncidentServiceServer() {}
-func (UnimplementedIncidentServiceServer) testEmbeddedByValue()                         {}
+func (UnimplementedArchiveServiceServer) mustEmbedUnimplementedArchiveServiceServer() {}
+func (UnimplementedArchiveServiceServer) testEmbeddedByValue()                        {}
 
-// UnsafeIncidentServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to IncidentServiceServer will
+// UnsafeArchiveServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ArchiveServiceServer will
 // result in compilation errors.
-type UnsafeIncidentServiceServer interface {
-	mustEmbedUnimplementedIncidentServiceServer()
+type UnsafeArchiveServiceServer interface {
+	mustEmbedUnimplementedArchiveServiceServer()
 }
 
-func RegisterIncidentServiceServer(s grpc.ServiceRegistrar, srv IncidentServiceServer) {
-	// If the following call panics, it indicates UnimplementedIncidentServiceServer was
+func RegisterArchiveServiceServer(s grpc.ServiceRegistrar, srv ArchiveServiceServer) {
+	// If the following call panics, it indicates UnimplementedArchiveServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&IncidentService_ServiceDesc, srv)
+	s.RegisterService(&ArchiveService_ServiceDesc, srv)
 }
 
-func _IncidentService_ReportIncident_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ArchiveService_ReceiveStoreIncident_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(IncidentReport)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IncidentServiceServer).ReportIncident(ctx, in)
+		return srv.(ArchiveServiceServer).ReceiveStoreIncident(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: IncidentService_ReportIncident_FullMethodName,
+		FullMethod: ArchiveService_ReceiveStoreIncident_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IncidentServiceServer).ReportIncident(ctx, req.(*IncidentReport))
+		return srv.(ArchiveServiceServer).ReceiveStoreIncident(ctx, req.(*IncidentReport))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// IncidentService_ServiceDesc is the grpc.ServiceDesc for IncidentService service.
+// ArchiveService_ServiceDesc is the grpc.ServiceDesc for ArchiveService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var IncidentService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "incident.IncidentService",
-	HandlerType: (*IncidentServiceServer)(nil),
+var ArchiveService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "incident.ArchiveService",
+	HandlerType: (*ArchiveServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "ReportIncident",
-			Handler:    _IncidentService_ReportIncident_Handler,
+			MethodName: "ReceiveStoreIncident",
+			Handler:    _ArchiveService_ReceiveStoreIncident_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

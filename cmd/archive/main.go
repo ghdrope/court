@@ -23,11 +23,13 @@ import (
 	"k8s.io/sample-controller/pkg/signals"
 )
 
+// main is the entrypoint for the Archive service binary.
+//
+// It initializes logging, sets up signal handling, and delegates
+// execution to the Cobra command tree.
 func main() {
-	// Setup a context that is automatically cancelled on SIGINT/SIGTERM.
 	ctx := signals.SetupSignalHandler()
 
-	// Initialize global logger
 	logger, err := zap.NewProduction()
 	if err != nil {
 		panic(err)

@@ -18,9 +18,12 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/ghdrope/court/internal/officer"
-	"github.com/ghdrope/court/internal/router"
+	grpcclient "github.com/ghdrope/court/internal/transport/grpc"
+	incidentpb "github.com/ghdrope/court/proto/incident"
+
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -34,27 +37,37 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// newPatrolCommand starts the k8s controller.
+// defaultArchiveAddr provides zero-config.
+const defaultArchiveAddr = "localhost:50052"
+
+// newPatrolCommand starts the k8s controller loop.
 func newPatrolCommand() *cobra.Command {
 
-	var apiAddr string
+	var archiveAddr string
 
 	cmd := &cobra.Command{
 		Use:  "patrol",
 		Args: cobra.NoArgs,
-
 		RunE: func(cmd *cobra.Command, _ []string) error {
 
 			logger := ctrl.Log.WithName("officer")
 			logger.Info("starting patrol controller")
 
-			// connect to API server
+			// Resolve Archive address
+			if archiveAddr == "" {
+				archiveAddr = os.Getenv("ARCHIVE_ADDR")
+				if archiveAddr == "" {
+					archiveAddr = defaultArchiveAddr
+					logger.Info("using default archive address", "addr", archiveAddr)
+				}
+			}
+			// Connect to Archive gRPC service
 			conn, err := grpc.NewClient(
-				apiAddr,
+				archiveAddr,
 				grpc.WithTransportCredentials(insecure.NewCredentials()),
 			)
 			if err != nil {
-				return fmt.Errorf("failed to connect to API server: %w", err)
+				return fmt.Errorf("failed to connect to archive: %w", err)
 			}
 
 			defer func() {
@@ -63,7 +76,11 @@ func newPatrolCommand() *cobra.Command {
 				}
 			}()
 
-			apiClient := router.NewAPIClient(conn)
+			// Create gRPC client
+			pbClient := incidentpb.NewArchiveServiceClient(conn)
+
+			// Wrap into domain client
+			archiveClient := grpcclient.NewArchiveClient(pbClient)
 
 			// Register Kubernetes API scheme
 			scheme := runtime.NewScheme()
@@ -80,14 +97,14 @@ func newPatrolCommand() *cobra.Command {
 				return fmt.Errorf("failed to create manager: %w", err)
 			}
 
-			// Create reconciler
+			// Reconciler
 			reconciler := &officer.PodReconciler{
-				Client: mgr.GetClient(),
-				Log:    log.Log.WithName("reconciler"),
-				API:    apiClient,
+				Client:  mgr.GetClient(),
+				Log:     log.Log.WithName("reconciler"),
+				Archive: archiveClient,
 			}
 
-			// Register Pod controller with manager
+			// Controller
 			if err := ctrl.NewControllerManagedBy(mgr).
 				For(&v1.Pod{}).
 				Complete(reconciler); err != nil {
@@ -100,7 +117,7 @@ func newPatrolCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&apiAddr, "api-addr", "localhost:50051", "API server gRPC address")
+	cmd.Flags().StringVar(&archiveAddr, "archive-addr", "", "default: env ARCHIVE_ADDR or localhost:50052")
 
 	return cmd
 }

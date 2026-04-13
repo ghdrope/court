@@ -22,11 +22,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd is the Officer base CLI command.
+// rootCmd is the base CLI command for the Officer
 var rootCmd = &cobra.Command{
 	Use:   "officer",
 	Short: "Court Officer CLI",
-	Long:  `CLI for monitoring Kubernetes pod health.`,
+	Long:  "Officer monitors Kubernetes workloads and reports incidents.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.HelpFunc()(cmd, args)
@@ -38,7 +38,6 @@ func Execute(ctx context.Context) error {
 	return rootCmd.ExecuteContext(ctx)
 }
 
-// init registers subcommands.
 func init() {
 	rootCmd.AddCommand(newPatrolCommand())
 }

@@ -18,37 +18,81 @@ package grpc
 
 import (
 	"context"
-	"log"
 
 	"github.com/ghdrope/court/internal/archive"
-	pb "github.com/ghdrope/court/proto/archive"
+	"github.com/ghdrope/court/internal/incident"
+	pb "github.com/ghdrope/court/proto/incident"
 )
 
-// ArchiveServer implements ArchiveService gRPC API.
+// ArchiveServer implements the gRPC ArchiveService.
+//
+// It acts as the ingestion layer that receives IncidentReports
+// over the network and persists them unsing the archive service.
 type ArchiveServer struct {
 	pb.UnimplementedArchiveServiceServer
 
-	Repo archive.Repository
+	archive *archive.Archive
 }
 
-// StoreIncident receives an incident and persists it.
-func (s *ArchiveServer) StoreIncident(
+// NewArchiveServer creates a new ArchiveServer instance.
+func NewArchiveServer(a *archive.Archive) *ArchiveServer {
+	return &ArchiveServer{
+		archive: a,
+	}
+}
+
+// ReceiveStoreIncident handles incoming IncidentReport requests.
+func (s *ArchiveServer) ReceiveStoreIncident(
 	ctx context.Context,
-	req *pb.StoreIncidentRequest,
-) (*pb.StoreIncidentResponse, error) {
+	req *pb.IncidentReport,
+) (*pb.Ack, error) {
 
-	log.Printf(
-		"storing incident id=%s pod=%s/%s",
-		req.Id,
-		req.Namespace,
-		req.PodName,
-	)
-
-	if err := s.Repo.Store(ctx, req); err != nil {
-		return nil, err
+	if req == nil {
+		return &pb.Ack{Success: false}, nil
 	}
 
-	return &pb.StoreIncidentResponse{
-		Success: true,
-	}, nil
+	// Convert protobuf -> domain model
+	report := convertProtoToDomain(req)
+
+	// Persist incident
+	if err := s.archive.StoreIncident(ctx, &report); err != nil {
+		return &pb.Ack{Success: false}, err
+	}
+
+	return &pb.Ack{Success: true}, nil
+}
+
+// convertProtoToDomain maps a protobuf IncidentReport
+// into the internal domain representation.
+func convertProtoToDomain(req *pb.IncidentReport) incident.IncidentReport {
+
+	events := make([]incident.K8sEvent, len(req.Events))
+	for i, e := range req.Events {
+		events[i] = incident.K8sEvent{
+			Type:    e.Type,
+			Reason:  e.Reason,
+			Message: e.Message,
+		}
+	}
+
+	containerIssues := make([]incident.ContainerIssue, len(req.ContainerIssues))
+	for i, c := range req.ContainerIssues {
+		containerIssues[i] = incident.ContainerIssue{
+			Container: c.Container,
+			Reason:    c.Reason,
+			Logs:      c.Logs,
+		}
+	}
+
+	return incident.IncidentReport{
+		ID:        req.Id,
+		Cluster:   req.Cluster,
+		Namespace: req.Namespace,
+		Pod:       req.Pod,
+
+		Events:          events,
+		ContainerIssues: containerIssues,
+
+		ProsecutorCommentary: req.ProsecutorCommentary,
+	}
 }
