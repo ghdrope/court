@@ -21,12 +21,10 @@ import (
 	"os"
 
 	"github.com/ghdrope/court/internal/officer"
-	grpcclient "github.com/ghdrope/court/internal/transport/grpc"
-	incidentpb "github.com/ghdrope/court/proto/incident"
+	redisstream "github.com/ghdrope/court/internal/transport/redis"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,12 +36,12 @@ import (
 )
 
 // defaultArchiveAddr provides zero-config.
-const defaultArchiveAddr = "localhost:50052"
+const defaultRedisAddr = "localhost:6379"
 
 // newPatrolCommand starts the k8s controller loop.
 func newPatrolCommand() *cobra.Command {
 
-	var archiveAddr string
+	var redisAddr string
 	var clusterName string
 
 	cmd := &cobra.Command{
@@ -54,15 +52,6 @@ func newPatrolCommand() *cobra.Command {
 			logger := ctrl.Log.WithName("officer")
 			logger.Info("starting patrol controller")
 
-			// Resolve Archive address
-			if archiveAddr == "" {
-				archiveAddr = os.Getenv("ARCHIVE_ADDR")
-				if archiveAddr == "" {
-					archiveAddr = defaultArchiveAddr
-					logger.Info("using default archive address", "addr", archiveAddr)
-				}
-			}
-
 			// Resolve Cluster name
 			if clusterName == "" {
 				clusterName = os.Getenv("CLUSTER_NAME")
@@ -71,26 +60,25 @@ func newPatrolCommand() *cobra.Command {
 				}
 			}
 
-			// Connect to Archive gRPC service
-			conn, err := grpc.NewClient(
-				archiveAddr,
-				grpc.WithTransportCredentials(insecure.NewCredentials()),
-			)
-			if err != nil {
-				return fmt.Errorf("failed to connect to archive: %w", err)
+			// Resolve Redis address
+			if redisAddr == "" {
+				redisAddr = os.Getenv("REDIS_ADDR")
+				if redisAddr == "" {
+					redisAddr = defaultRedisAddr
+					logger.Info("using default redis address", "redis-addr", redisAddr)
+				}
 			}
 
-			defer func() {
-				if err = conn.Close(); err != nil {
-					logger.Error(err, "failed to close gRPC connection")
-				}
-			}()
+			// Create Redis base client
+			rdb := redis.NewClient(&redis.Options{
+				Addr: redisAddr,
+			})
+			baseClient := redisstream.NewClient(rdb)
 
-			// Create gRPC client
-			pbClient := incidentpb.NewArchiveServiceClient(conn)
-
-			// Wrap into domain client
-			archiveClient := grpcclient.NewArchiveClient(pbClient)
+			// Domain-specific stream client
+			incidentClient := redisstream.IncidentStreamClient{
+				Client: baseClient,
+			}
 
 			// Register Kubernetes API scheme
 			scheme := runtime.NewScheme()
@@ -111,7 +99,7 @@ func newPatrolCommand() *cobra.Command {
 			reconciler := &officer.PodReconciler{
 				Client:  mgr.GetClient(),
 				Log:     log.Log.WithName("reconciler"),
-				Archive: archiveClient,
+				Archive: &incidentClient,
 				Cluster: clusterName,
 			}
 
@@ -128,7 +116,8 @@ func newPatrolCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&archiveAddr, "archive-addr", "", "default: env ARCHIVE_ADDR or localhost:50052")
+	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
+	cmd.Flags().StringVar(&clusterName, "cluster", "", "Cluster name")
 
 	return cmd
 }

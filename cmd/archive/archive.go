@@ -19,34 +19,43 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"net"
 	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"github.com/ghdrope/court/internal/archive"
-	grpcserver "github.com/ghdrope/court/internal/transport/grpc"
-	incidentpb "github.com/ghdrope/court/proto/incident"
+	redisstream "github.com/ghdrope/court/internal/transport/redis"
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
 )
 
 // defaultDSN is used when DATABASE_URL is not provided.
 // Enables zero-config
+const defaultRedisAddr = "localhost:6379"
 const defaultDSN = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
 
-// newServeCommand starts the Archive gRPC server.
-func newServeCommand() *cobra.Command {
+// newArchiveCommand starts the Archive service.
+func newArchiveCommand() *cobra.Command {
 
-	var port string
+	var redisAddr string
 
 	cmd := &cobra.Command{
-		Use:   "serve",
-		Short: "Start gRPC Archive server",
+		Use:   "archive",
+		Short: "Start gRPC Archive service",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			ctx := cmd.Context()
+
+			// Resolve Redis address
+			if redisAddr == "" {
+				redisAddr = os.Getenv("REDIS_ADDR")
+				if redisAddr == "" {
+					redisAddr = defaultRedisAddr
+					zap.L().Warn("REDIS_ADDR not set, using default",
+						zap.String("redis-addr", redisAddr))
+				}
+			}
 
 			// Resolve database DSN
 			dsn := os.Getenv("DATABASE_URL")
@@ -81,43 +90,24 @@ func newServeCommand() *cobra.Command {
 				return fmt.Errorf("init schema: %w", err)
 			}
 
-			// Start TCP listener
-			lis, err := net.Listen("tcp", ":"+port)
-			if err != nil {
-				return fmt.Errorf("listen: %w", err)
+			rdb := redis.NewClient(&redis.Options{
+				Addr: redisAddr,
+			})
+
+			baseClient := redisstream.NewClient(rdb)
+			incidentClient := redisstream.NewIncidentStreamClient(baseClient)
+
+			if err := incidentClient.EnsureGroup(ctx); err != nil {
+				return err
 			}
 
-			// Create gRPC server
-			grpcServer := grpc.NewServer()
+			zap.L().Info("archive worker started")
 
-			// Register ArchiveService
-			incidentpb.RegisterArchiveServiceServer(
-				grpcServer,
-				grpcserver.NewArchiveServer(arch),
-			)
-
-			zap.L().Info("archive service running",
-				zap.String("port", port))
-
-			// Start server in background
-			go func() {
-				if err := grpcServer.Serve(lis); err != nil {
-					zap.L().Error("grpc server error", zap.Error(err))
-				}
-			}()
-
-			// Wait for shutdown signal
-			<-ctx.Done()
-
-			zap.L().Info("shutting down archive server")
-
-			grpcServer.GracefulStop()
-
-			return nil
+			return incidentClient.ConsumeLoop(ctx, arch)
 		},
 	}
 
-	cmd.Flags().StringVar(&port, "port", "50052", "gRPC port")
+	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
 
 	return cmd
 }
