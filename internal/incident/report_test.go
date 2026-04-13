@@ -18,60 +18,104 @@ package incident
 
 import (
 	"testing"
-
-	v1 "k8s.io/api/core/v1"
 )
 
-// TestIncidentReport_Structure ensures the struct fields behave as expected.
+// TestIncidentReport_Structure ensures that the IncidentReport structure
+// correctly holds and exposes data without transformation or side effects.
 func TestIncidentReport_Structure(t *testing.T) {
 	report := IncidentReport{
-		ID:        "test-id",
-		PodName:   "pod-1",
+		ID: "test-id",
+
+		Cluster:   "cluster-1",
 		Namespace: "default",
-		Phase:     v1.PodFailed,
-		Reason:    "Failed",
-		ContainerIssues: []ContainerIssue{
-			{Container: "app", Reason: "CrashLoopBackOff"},
+		Pod:       "pod-1",
+
+		Events: []K8sEvent{
+			{
+				Type:    "Normal",
+				Reason:  "BackOff",
+				Message: "Back-off restarting failed container",
+			},
 		},
-		Logs: []string{"log1"},
+
+		ContainerIssues: []ContainerIssue{
+			{
+				Container: "app",
+				Reason:    "CrashLoopBackOff",
+				Logs:      []string{"Back-off pulling image app/latest"},
+			},
+		},
 	}
 
-	// Validate basic fields
+	// Validate identity
 	if report.ID != "test-id" {
-		t.Errorf("unexpected ID: %s", report.ID)
+		t.Errorf("unexpected ID: got %s, want %s", report.ID, "test-id")
 	}
 
-	if report.PodName != "pod-1" {
-		t.Errorf("unexpected pod name: %s", report.PodName)
+	if report.Cluster != "cluster-1" {
+		t.Errorf("unexpected ID: got %s, want %s", report.Cluster, "cluster-1")
+	}
+
+	if report.Pod != "pod-1" {
+		t.Errorf("unexpected pod: got %s, want %s", report.Pod, "pod-1")
+	}
+
+	if report.Namespace != "default" {
+		t.Errorf("unexpected namespace: got %s, want %s", report.Namespace, "default")
+	}
+
+	// Validate events
+	if len(report.Events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(report.Events))
+	}
+
+	if report.Events[0].Reason != "BackOff" {
+		t.Errorf("unexpected event reason: got %s, want %s", report.Events[0].Reason, "BackOff")
 	}
 
 	// Validate container issues
 	if len(report.ContainerIssues) != 1 {
-		t.Fatalf("expected 1 container issue")
+		t.Fatalf("expected 1 container issue, got %d", len(report.ContainerIssues))
 	}
 
 	if report.ContainerIssues[0].Reason != "CrashLoopBackOff" {
-		t.Errorf("unexpected container issue reason")
+		t.Errorf("unexpected container issue reason: got %s, want %s",
+			report.ContainerIssues[0].Reason,
+			"CrashLoopBackOff",
+		)
 	}
 
-	// Validate logs
-	if len(report.Logs) != 1 {
-		t.Fatalf("expected 1 log entry")
+	// Validate logs inside container issue
+	if len(report.ContainerIssues[0].Logs) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(report.ContainerIssues[0].Logs))
+	}
+
+	if report.ContainerIssues[0].Logs[0] != "Back-off pulling image app/latest" {
+		t.Errorf("unexpected log content: got %s, want %s",
+			report.ContainerIssues[0].Logs[0],
+			"Back-off pulling image app/latest",
+		)
 	}
 }
 
-// TestContainerIssue_Structure ensures ContainerIssue struct correctness.
+// TestContainerIssue_Structure ensures that ContainerIssue behaves
+// as a simple data container without hidden logic.
 func TestContainerIssue_Structure(t *testing.T) {
 	ci := ContainerIssue{
-		Container: "nginx",
+		Container: "app",
 		Reason:    "OOMKilled",
+		Logs:      []string{"out of memory"},
 	}
 
-	if ci.Container != "nginx" {
-		t.Errorf("unexpected container: %s", ci.Container)
+	if ci.Container != "app" {
+		t.Errorf("unexpected container: got %s, want %s", ci.Container, "nginx")
 	}
 
 	if ci.Reason != "OOMKilled" {
-		t.Errorf("unexpected reason: %s", ci.Reason)
+		t.Errorf("unexpected reason: got %s, want %s", ci.Reason, "OOMKilled")
+	}
+
+	if len(ci.Logs) != 1 {
+		t.Fatalf("expected 1 log entry, got %d", len(ci.Logs))
 	}
 }

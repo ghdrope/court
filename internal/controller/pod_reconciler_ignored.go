@@ -36,7 +36,7 @@ func TestReconcile_NoProblem(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = v1.AddToScheme(scheme)
 
-	pod := testhelper.NewTestPod("default", "pod-ok", v1.PodRunning)
+	pod := testhelper.NewTestPod("default", "pod-ok")
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -77,7 +77,7 @@ func TestReconcile_FailedPod(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = v1.AddToScheme(scheme)
 
-	pod := testhelper.NewTestPod("default", "pod-failed", v1.PodFailed)
+	pod := testhelper.NewTestPod("default", "pod-failed")
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -124,7 +124,7 @@ func TestReconcile_APIFailure(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = v1.AddToScheme(scheme)
 
-	pod := testhelper.NewTestPod("default", "pod-failed", v1.PodFailed)
+	pod := testhelper.NewTestPod("default", "pod-failed")
 
 	client := fake.NewClientBuilder().
 		WithScheme(scheme).

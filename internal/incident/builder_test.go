@@ -20,45 +20,58 @@ import (
 	"testing"
 
 	"github.com/ghdrope/court/pkg/testhelper"
-	v1 "k8s.io/api/core/v1"
 )
 
-// TestBuildFromPod_Success validates that a valid pod produces a correct IncidentReport.
+// TestBuildFromPod_Success validates that a valid pod produces a correct
+// IncidentReport with proper identity and container issue propagation.
 func TestBuildFromPod_Success(t *testing.T) {
-	pod := testhelper.NewTestPod("default", "pod-1", v1.PodFailed)
+	pod := testhelper.NewTestPod("default", "pod-1")
 
-	containerIssues := []ContainerIssue{
-		{Container: "app", Reason: "CrashLoopBackOff"},
+	events := []K8sEvent{
+		{
+			Type:    "Normal",
+			Reason:  "BackOff",
+			Message: "Back-off restarting failed container",
+		},
 	}
 
-	logs := []string{"log1", "log2"}
+	containerIssues := []ContainerIssue{
+		{
+			Container: "app",
+			Reason:    "CrashLoopBackOff",
+			Logs:      []string{"log1", "log2"},
+		},
+	}
 
-	report, err := BuildFromPod(pod, containerIssues, logs)
+	report, err := BuildFromPod(pod, events, containerIssues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Validate generated ID
+	// Validate ID generation
 	if report.ID == "" {
 		t.Error("expected non-empty ID")
 	}
 
-	// Validate basic fields mapping
-	if report.PodName != "pod-1" {
-		t.Errorf("unexpected pod name: %s", report.PodName)
+	// Validate identity mapping
+	if report.Pod != "pod-1" {
+		t.Errorf("unexpected pod: got %s, want %s", report.Pod, "pod-1")
 	}
 
 	if report.Namespace != "default" {
-		t.Errorf("unexpected namespace: %s", report.Namespace)
+		t.Errorf("unexpected namespace: got %s, want %s", report.Namespace, "default")
 	}
 
-	if report.Phase != v1.PodFailed {
-		t.Errorf("unexpected phase: %s", report.Phase)
+	// Validate events propagation
+	if len(report.Events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(report.Events))
 	}
 
-	// Reason is derived from phase
-	if report.Reason != string(v1.PodFailed) {
-		t.Errorf("unexpected reason: %s", report.Reason)
+	if report.Events[0].Reason != "BackOff" {
+		t.Errorf("unexpected event reason: got %s, want %s",
+			report.Events[0].Reason,
+			"BackOff",
+		)
 	}
 
 	// Validate container issues propagation
@@ -67,16 +80,27 @@ func TestBuildFromPod_Success(t *testing.T) {
 	}
 
 	if report.ContainerIssues[0].Container != "app" {
-		t.Errorf("unexpected container: %s", report.ContainerIssues[0].Container)
+		t.Errorf("unexpected container: got %s, want %s",
+			report.ContainerIssues[0].Container,
+			"app",
+		)
 	}
 
-	// Validate logs propagation
-	if len(report.Logs) != 2 {
-		t.Fatalf("expected 2 logs, got %d", len(report.Logs))
+	if report.ContainerIssues[0].Reason != "CrashLoopBackOff" {
+		t.Errorf("unexpected reason: got %s, want %s",
+			report.ContainerIssues[0].Reason,
+			"CrashLoopBackOff",
+		)
+	}
+
+	// Validate logs inside container issue
+	if len(report.ContainerIssues[0].Logs) != 2 {
+		t.Fatalf("expected 2 logs, got %d", len(report.ContainerIssues[0].Logs))
 	}
 }
 
-// TestBuildFromPod_NilPod ensures nil pod returns an error.
+// TestBuildFromPod_NilPod ensures nil pod input returns an error
+// and does not produce a valid IncidentReport.
 func TestBuildFromPod_NilPod(t *testing.T) {
 	report, err := BuildFromPod(nil, nil, nil)
 
@@ -89,52 +113,68 @@ func TestBuildFromPod_NilPod(t *testing.T) {
 	}
 }
 
-// TestBuildFromPod_EmptySlices ensures empty inputs are handled correctly.
+// TestBuildFromPod_EmptySlices ensures empty that empty inputs are handled
+// correctly without causing nil pointer issues or unexpected data.
 func TestBuildFromPod_EmptySlices(t *testing.T) {
-	pod := testhelper.NewTestPod("default", "pod-empty", v1.PodRunning)
+	pod := testhelper.NewTestPod("default", "pod-empty")
 
 	report, err := BuildFromPod(pod, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Slices should remain nil
-	if report.ContainerIssues != nil {
-		t.Error("expected nil container issues")
+	// Events should be nil when not provided
+	if report.Events != nil {
+		t.Error("expected nil events slice")
 	}
 
-	if report.Logs != nil {
-		t.Error("expected nil logs")
+	// Container issues should be nil when not provided
+	if report.ContainerIssues != nil {
+		t.Error("expected nil container issues slice")
 	}
 }
 
-// TestBuildFromPod_TableDriven validates multiple pod phases.
+// TestBuildFromPod_TableDriven validates multiple pod identities
+// are correctly mapped into IncidentReport without depending on phase logic.
 func TestBuildFromPod_TableDriven(t *testing.T) {
 	tests := []struct {
-		name  string
-		phase v1.PodPhase
+		name      string
+		namespace string
+		podName   string
 	}{
-		{"Running", v1.PodRunning},
-		{"Failed", v1.PodFailed},
-		{"Pending", v1.PodPending},
-		{"Unknown", v1.PodUnknown},
+		{
+			name:      "basic mapping",
+			namespace: "ns-1",
+			podName:   "pod-a",
+		},
+		{
+			name:      "another pod",
+			namespace: "ns-2",
+			podName:   "pod-b",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pod := testhelper.NewTestPod("ns", "pod", tt.phase)
+			pod := testhelper.NewTestPod(tt.namespace, tt.podName)
 
 			report, err := BuildFromPod(pod, nil, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if report.Phase != tt.phase {
-				t.Errorf("expected phase %s, got %s", tt.phase, report.Phase)
+			if report.Namespace != tt.namespace {
+				t.Errorf("expected namespace %s, got %s",
+					tt.namespace,
+					report.Namespace,
+				)
 			}
 
-			if report.Reason != string(tt.phase) {
-				t.Errorf("expected reason %s, got %s", tt.phase, report.Reason)
+			if report.Pod != tt.podName {
+				t.Errorf("expected pod %s, got %s",
+					tt.podName,
+					report.Pod,
+				)
 			}
 		})
 	}
