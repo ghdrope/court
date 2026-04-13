@@ -44,6 +44,7 @@ const defaultArchiveAddr = "localhost:50052"
 func newPatrolCommand() *cobra.Command {
 
 	var archiveAddr string
+	var clusterName string
 
 	cmd := &cobra.Command{
 		Use:  "patrol",
@@ -61,6 +62,15 @@ func newPatrolCommand() *cobra.Command {
 					logger.Info("using default archive address", "addr", archiveAddr)
 				}
 			}
+
+			// Resolve Cluster name
+			if clusterName == "" {
+				clusterName = os.Getenv("CLUSTER_NAME")
+				if clusterName == "" {
+					return fmt.Errorf("cluster name must be set via --cluster or CLUSTER_NAME")
+				}
+			}
+
 			// Connect to Archive gRPC service
 			conn, err := grpc.NewClient(
 				archiveAddr,
@@ -102,6 +112,7 @@ func newPatrolCommand() *cobra.Command {
 				Client:  mgr.GetClient(),
 				Log:     log.Log.WithName("reconciler"),
 				Archive: archiveClient,
+				Cluster: clusterName,
 			}
 
 			// Controller

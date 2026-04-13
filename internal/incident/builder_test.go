@@ -27,6 +27,8 @@ import (
 func TestBuildFromPod_Success(t *testing.T) {
 	pod := testhelper.NewTestPod("default", "pod-1")
 
+	cluster := "test-cluster"
+
 	events := []K8sEvent{
 		{
 			Type:    "Normal",
@@ -43,7 +45,7 @@ func TestBuildFromPod_Success(t *testing.T) {
 		},
 	}
 
-	report, err := BuildFromPod(pod, events, containerIssues)
+	report, err := BuildFromPod(pod, cluster, events, containerIssues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -51,6 +53,10 @@ func TestBuildFromPod_Success(t *testing.T) {
 	// Validate ID generation
 	if report.ID == "" {
 		t.Error("expected non-empty ID")
+	}
+
+	if report.Cluster != cluster {
+		t.Errorf("expected cluster %s, got %s", cluster, report.Cluster)
 	}
 
 	// Validate identity mapping
@@ -102,7 +108,7 @@ func TestBuildFromPod_Success(t *testing.T) {
 // TestBuildFromPod_NilPod ensures nil pod input returns an error
 // and does not produce a valid IncidentReport.
 func TestBuildFromPod_NilPod(t *testing.T) {
-	report, err := BuildFromPod(nil, nil, nil)
+	report, err := BuildFromPod(nil, "", nil, nil)
 
 	if err == nil {
 		t.Fatal("expected error for nil pod")
@@ -118,7 +124,7 @@ func TestBuildFromPod_NilPod(t *testing.T) {
 func TestBuildFromPod_EmptySlices(t *testing.T) {
 	pod := testhelper.NewTestPod("default", "pod-empty")
 
-	report, err := BuildFromPod(pod, nil, nil)
+	report, err := BuildFromPod(pod, "cluster", nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -158,7 +164,7 @@ func TestBuildFromPod_TableDriven(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pod := testhelper.NewTestPod(tt.namespace, tt.podName)
 
-			report, err := BuildFromPod(pod, nil, nil)
+			report, err := BuildFromPod(pod, "cluster", nil, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

@@ -40,6 +40,8 @@ type PodReconciler struct {
 	Log logr.Logger
 
 	Archive ArchiveClient
+
+	Cluster string
 }
 
 // Reconcile evaluates the current state of a Pod and determines whether
@@ -76,6 +78,7 @@ func (r *PodReconciler) Reconcile(
 	// Build domain-level incident report
 	report, err := incident.BuildFromPod(
 		&pod,
+		r.Cluster,
 		nil, // events (TBD),
 		containerIssues,
 	)

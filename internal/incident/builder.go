@@ -30,6 +30,7 @@ import (
 // runtime state and the IncidentReport model.
 func BuildFromPod(
 	pod *v1.Pod,
+	cluster string,
 	events []K8sEvent,
 	containerIssues []ContainerIssue,
 ) (IncidentReport, error) {
@@ -42,7 +43,7 @@ func BuildFromPod(
 		ID: uuid.NewString(),
 
 		// Target workload identity
-		Cluster:   "",
+		Cluster:   cluster,
 		Namespace: pod.Namespace,
 		Pod:       pod.Name,
 
