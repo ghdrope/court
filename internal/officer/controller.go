@@ -14,13 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package officer
 
 import (
 	"context"
 
 	"github.com/ghdrope/court/internal/incident"
-	"github.com/ghdrope/court/internal/inspector"
 	"github.com/ghdrope/court/internal/router"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
@@ -60,7 +59,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	// Inspect container-level issues such as CrashLoopBackOff or OOMKilled.
-	containerIssues := inspector.DetectContainerIssues(&pod)
+	containerIssues := DetectContainerIssues(&pod)
 
 	isProblem :=
 		pod.Status.Phase == v1.PodFailed ||
