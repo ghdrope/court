@@ -23,14 +23,11 @@ import (
 )
 
 // NewTestPod creates a basic Pod object for testing.
-func NewTestPod(namespace, name string, phase v1.PodPhase) *v1.Pod {
+func NewTestPod(namespace, name string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: ctrl.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
-		},
-		Status: v1.PodStatus{
-			Phase: phase,
 		},
 	}
 }

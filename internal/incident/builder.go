@@ -23,16 +23,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// BuildFromPod constructs an IncidentReport from a given Pod,
-// extracting its metadata, phase, and detected container issues.
-// Logs are provided externally and attached as-is.
+// BuildFromPod constructs an IncidentReport from a Kubernetes Pod and
+// pre-evaluated container issues.
 //
-// This function acts as a translation layer between raw Kubernetes
-// Pod state and the domain-level IncidentReport model.
+// This function acts as a translation layer between Kubernetes
+// runtime state and the IncidentReport model.
 func BuildFromPod(
 	pod *v1.Pod,
+	events []K8sEvent,
 	containerIssues []ContainerIssue,
-	logs []string,
 ) (IncidentReport, error) {
 
 	if pod == nil {
@@ -42,12 +41,15 @@ func BuildFromPod(
 	return IncidentReport{
 		ID: uuid.NewString(),
 
-		PodName:   pod.Name,
+		// Target workload identity
+		Cluster:   "",
 		Namespace: pod.Namespace,
-		Phase:     pod.Status.Phase,
-		Reason:    string(pod.Status.Phase),
+		Pod:       pod.Name,
 
+		// Core evidence
+		Events: events,
+
+		// Container-level evidence
 		ContainerIssues: containerIssues,
-		Logs:            logs,
 	}, nil
 }

@@ -30,8 +30,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// PodReconciler reconciles Pod resources and detects failure conditions,
-// producing IncidentReports for unhealthy pods.
+// PodReconciler reconciles Pod resources and produces IncidentReports,
+// for workloads that match known failure conditions.
 type PodReconciler struct {
 	client.Client
 	Log logr.Logger
@@ -39,9 +39,12 @@ type PodReconciler struct {
 	API router.IncidentSender
 }
 
-// Reconcile is triggered on Pod events and evaluates the current Pod state.
-// When a failure condition or container issue is detected, it builds an
-// incidentReport representing the observed problem.
+// Reconcile evaluates the current state of a Pod and determines whether
+// it should generate an IncidentReport.
+//
+// A report is created when:
+//   - the Pod is in a failed/unknown phase OR
+//   - container-level issues are detected by the inspector
 func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	logger := r.Log.WithValues(
@@ -51,7 +54,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	var pod v1.Pod
 
-	// Fetch the latest state of the Pod from the API server.
+	// Fetch latest Pod state
 	if err := r.Get(ctx, req.NamespacedName, &pod); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -71,21 +74,18 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	// Build a structured incident report from the Pod state.
 	report, err := incident.BuildFromPod(
 		&pod,
+		nil,
 		containerIssues,
-		[]string{}, // logs later (TBD
 	)
 	if err != nil {
 		logger.Error(err, "failed to build incident report")
 		return ctrl.Result{}, err
 	}
 
+	// Map domain report to protobuf format
 	pbReport := &pb.IncidentReport{
 		Id:        report.ID,
-		PodName:   report.PodName,
 		Namespace: report.Namespace,
-		Phase:     string(report.Phase),
-		Reason:    report.Reason,
-		Logs:      report.Logs,
 	}
 
 	for _, ci := range report.ContainerIssues {
