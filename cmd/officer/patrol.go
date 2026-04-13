@@ -19,7 +19,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/ghdrope/court/internal/controller"
+	"github.com/ghdrope/court/internal/officer"
 	"github.com/ghdrope/court/internal/router"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -81,7 +81,7 @@ func newPatrolCommand() *cobra.Command {
 			}
 
 			// Create reconciler
-			reconciler := &controller.PodReconciler{
+			reconciler := &officer.PodReconciler{
 				Client: mgr.GetClient(),
 				Log:    log.Log.WithName("reconciler"),
 				API:    apiClient,

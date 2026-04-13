@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package inspector
+package officer
 
 import (
 	"github.com/ghdrope/court/internal/incident"
