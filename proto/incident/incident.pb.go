@@ -24,9 +24,14 @@ const (
 // ContainerIssue represents a failure or abnormal state detected
 // in a specific container within a Pod.
 type ContainerIssue struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Container     string                 `protobuf:"bytes,1,opt,name=container,proto3" json:"container,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// container is the name of the container within the Pod.
+	Container string `protobuf:"bytes,1,opt,name=container,proto3" json:"container,omitempty"`
+	// reason is the raw Kubernetes termination reason
+	Reason string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	// logs contains a snapshot of container logs relevant
+	// to the failure condition.
+	Logs          []string `protobuf:"bytes,3,rep,name=logs,proto3" json:"logs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -75,26 +80,109 @@ func (x *ContainerIssue) GetReason() string {
 	return ""
 }
 
-// IncidentReport describes a detected Pod failure event produced by the Officer.
-// It contains metadata about the Pod, its current state, and any container-level issues.
-type IncidentReport struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	PodName   string                 `protobuf:"bytes,2,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
-	Namespace string                 `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	Phase     string                 `protobuf:"bytes,4,opt,name=phase,proto3" json:"phase,omitempty"`
-	Reason    string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
-	// container_issues lists detected runtime issues for containers in the Pod.
-	ContainerIssues []*ContainerIssue `protobuf:"bytes,6,rep,name=container_issues,json=containerIssues,proto3" json:"container_issues,omitempty"`
-	// logs contains a limited snapshot of relevant Pod logs.
-	Logs          []string `protobuf:"bytes,7,rep,name=logs,proto3" json:"logs,omitempty"`
+func (x *ContainerIssue) GetLogs() []string {
+	if x != nil {
+		return x.Logs
+	}
+	return nil
+}
+
+// K8sEvent represents a Kubernetes event associated with the Pod.
+//
+// These events provide primary diagnostic context for the incident
+// and are used to understand cluster-level state transitions.
+type K8SEvent struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// type is the event type
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	// reason is the Kubernetes event reason
+	Reason string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	// message is the human-readable event description.
+	Message       string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *K8SEvent) Reset() {
+	*x = K8SEvent{}
+	mi := &file_proto_incident_incident_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *K8SEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*K8SEvent) ProtoMessage() {}
+
+func (x *K8SEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_incident_incident_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use K8SEvent.ProtoReflect.Descriptor instead.
+func (*K8SEvent) Descriptor() ([]byte, []int) {
+	return file_proto_incident_incident_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *K8SEvent) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *K8SEvent) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *K8SEvent) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+// IncidentReport is the representation of a detected Pod failure
+// produced by the Officer component.
+//
+// It is the single source of a Kubernetes workload failure.
+type IncidentReport struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// id uniquely identifies the incident event.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// cluster is the name of the Kubernetes cluster where the Pod ran.
+	Cluster string `protobuf:"bytes,2,opt,name=cluster,proto3" json:"cluster,omitempty"`
+	// namespace is the Kubernetes namespace of the Pod.
+	Namespace string `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	// pod is the name of the Kubernetes Pod that failed.
+	Pod string `protobuf:"bytes,4,opt,name=pod,proto3" json:"pod,omitempty"`
+	// events contains Kubernetes events related to the Pod lifecycle
+	// and failure context.
+	Events []*K8SEvent `protobuf:"bytes,5,rep,name=events,proto3" json:"events,omitempty"`
+	// container_issues contains detected issues at container level.
+	ContainerIssues []*ContainerIssue `protobuf:"bytes,6,rep,name=container_issues,json=containerIssues,proto3" json:"container_issues,omitempty"`
+	// prosecutor_commentary is filled by prosecutor after the initial
+	// incident creation.
+	ProsecutorCommentary string `protobuf:"bytes,7,opt,name=prosecutor_commentary,json=prosecutorCommentary,proto3" json:"prosecutor_commentary,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
 func (x *IncidentReport) Reset() {
 	*x = IncidentReport{}
-	mi := &file_proto_incident_incident_proto_msgTypes[1]
+	mi := &file_proto_incident_incident_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -106,7 +194,7 @@ func (x *IncidentReport) String() string {
 func (*IncidentReport) ProtoMessage() {}
 
 func (x *IncidentReport) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_incident_incident_proto_msgTypes[1]
+	mi := &file_proto_incident_incident_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -119,7 +207,7 @@ func (x *IncidentReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IncidentReport.ProtoReflect.Descriptor instead.
 func (*IncidentReport) Descriptor() ([]byte, []int) {
-	return file_proto_incident_incident_proto_rawDescGZIP(), []int{1}
+	return file_proto_incident_incident_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *IncidentReport) GetId() string {
@@ -129,9 +217,9 @@ func (x *IncidentReport) GetId() string {
 	return ""
 }
 
-func (x *IncidentReport) GetPodName() string {
+func (x *IncidentReport) GetCluster() string {
 	if x != nil {
-		return x.PodName
+		return x.Cluster
 	}
 	return ""
 }
@@ -143,18 +231,18 @@ func (x *IncidentReport) GetNamespace() string {
 	return ""
 }
 
-func (x *IncidentReport) GetPhase() string {
+func (x *IncidentReport) GetPod() string {
 	if x != nil {
-		return x.Phase
+		return x.Pod
 	}
 	return ""
 }
 
-func (x *IncidentReport) GetReason() string {
+func (x *IncidentReport) GetEvents() []*K8SEvent {
 	if x != nil {
-		return x.Reason
+		return x.Events
 	}
-	return ""
+	return nil
 }
 
 func (x *IncidentReport) GetContainerIssues() []*ContainerIssue {
@@ -164,25 +252,27 @@ func (x *IncidentReport) GetContainerIssues() []*ContainerIssue {
 	return nil
 }
 
-func (x *IncidentReport) GetLogs() []string {
+func (x *IncidentReport) GetProsecutorCommentary() string {
 	if x != nil {
-		return x.Logs
+		return x.ProsecutorCommentary
 	}
-	return nil
+	return ""
 }
 
-// Ack represents a simple acknowledgment response returned by the API server.
-// It indicates whether the incident was successfully received and forwarded.
+// Ack represents a simple acknowledgment returned by the Archive service.
+//
+// It indicates whether the incident was successfully received and persisted.
 type Ack struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// success indicates whether the operation completed successfully.
+	Success       bool `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Ack) Reset() {
 	*x = Ack{}
-	mi := &file_proto_incident_incident_proto_msgTypes[2]
+	mi := &file_proto_incident_incident_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -194,7 +284,7 @@ func (x *Ack) String() string {
 func (*Ack) ProtoMessage() {}
 
 func (x *Ack) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_incident_incident_proto_msgTypes[2]
+	mi := &file_proto_incident_incident_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -207,7 +297,7 @@ func (x *Ack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ack.ProtoReflect.Descriptor instead.
 func (*Ack) Descriptor() ([]byte, []int) {
-	return file_proto_incident_incident_proto_rawDescGZIP(), []int{2}
+	return file_proto_incident_incident_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Ack) GetSuccess() bool {
@@ -221,22 +311,27 @@ var File_proto_incident_incident_proto protoreflect.FileDescriptor
 
 const file_proto_incident_incident_proto_rawDesc = "" +
 	"\n" +
-	"\x1dproto/incident/incident.proto\x12\bincident\"F\n" +
+	"\x1dproto/incident/incident.proto\x12\bincident\"Z\n" +
 	"\x0eContainerIssue\x12\x1c\n" +
 	"\tcontainer\x18\x01 \x01(\tR\tcontainer\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xe0\x01\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x12\n" +
+	"\x04logs\x18\x03 \x03(\tR\x04logs\"P\n" +
+	"\bK8sEvent\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\x90\x02\n" +
 	"\x0eIncidentReport\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x19\n" +
-	"\bpod_name\x18\x02 \x01(\tR\apodName\x12\x1c\n" +
-	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12\x14\n" +
-	"\x05phase\x18\x04 \x01(\tR\x05phase\x12\x16\n" +
-	"\x06reason\x18\x05 \x01(\tR\x06reason\x12C\n" +
-	"\x10container_issues\x18\x06 \x03(\v2\x18.incident.ContainerIssueR\x0fcontainerIssues\x12\x12\n" +
-	"\x04logs\x18\a \x03(\tR\x04logs\"\x1f\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\acluster\x18\x02 \x01(\tR\acluster\x12\x1c\n" +
+	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12\x10\n" +
+	"\x03pod\x18\x04 \x01(\tR\x03pod\x12*\n" +
+	"\x06events\x18\x05 \x03(\v2\x12.incident.K8sEventR\x06events\x12C\n" +
+	"\x10container_issues\x18\x06 \x03(\v2\x18.incident.ContainerIssueR\x0fcontainerIssues\x123\n" +
+	"\x15prosecutor_commentary\x18\a \x01(\tR\x14prosecutorCommentary\"\x1f\n" +
 	"\x03Ack\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2L\n" +
-	"\x0fIncidentService\x129\n" +
-	"\x0eReportIncident\x12\x18.incident.IncidentReport\x1a\r.incident.AckB+Z)github.com/ghdrope/court/proto/incidentpbb\x06proto3"
+	"\asuccess\x18\x01 \x01(\bR\asuccess2Q\n" +
+	"\x0eArchiveService\x12?\n" +
+	"\x14ReceiveStoreIncident\x12\x18.incident.IncidentReport\x1a\r.incident.AckB+Z)github.com/ghdrope/court/proto/incidentpbb\x06proto3"
 
 var (
 	file_proto_incident_incident_proto_rawDescOnce sync.Once
@@ -250,21 +345,23 @@ func file_proto_incident_incident_proto_rawDescGZIP() []byte {
 	return file_proto_incident_incident_proto_rawDescData
 }
 
-var file_proto_incident_incident_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_proto_incident_incident_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_proto_incident_incident_proto_goTypes = []any{
 	(*ContainerIssue)(nil), // 0: incident.ContainerIssue
-	(*IncidentReport)(nil), // 1: incident.IncidentReport
-	(*Ack)(nil),            // 2: incident.Ack
+	(*K8SEvent)(nil),       // 1: incident.K8sEvent
+	(*IncidentReport)(nil), // 2: incident.IncidentReport
+	(*Ack)(nil),            // 3: incident.Ack
 }
 var file_proto_incident_incident_proto_depIdxs = []int32{
-	0, // 0: incident.IncidentReport.container_issues:type_name -> incident.ContainerIssue
-	1, // 1: incident.IncidentService.ReportIncident:input_type -> incident.IncidentReport
-	2, // 2: incident.IncidentService.ReportIncident:output_type -> incident.Ack
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 0: incident.IncidentReport.events:type_name -> incident.K8sEvent
+	0, // 1: incident.IncidentReport.container_issues:type_name -> incident.ContainerIssue
+	2, // 2: incident.ArchiveService.ReceiveStoreIncident:input_type -> incident.IncidentReport
+	3, // 3: incident.ArchiveService.ReceiveStoreIncident:output_type -> incident.Ack
+	3, // [3:4] is the sub-list for method output_type
+	2, // [2:3] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_proto_incident_incident_proto_init() }
@@ -278,7 +375,7 @@ func file_proto_incident_incident_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_incident_incident_proto_rawDesc), len(file_proto_incident_incident_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

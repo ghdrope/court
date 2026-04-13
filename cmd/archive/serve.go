@@ -19,7 +19,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"net"
 	"os"
 
@@ -28,12 +27,16 @@ import (
 
 	"github.com/ghdrope/court/internal/archive"
 	grpcserver "github.com/ghdrope/court/internal/transport/grpc"
-	archivepb "github.com/ghdrope/court/proto/archive"
+	incidentpb "github.com/ghdrope/court/proto/incident"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 )
 
-// newServeCommand starts the archive.
+// defaultDSN is used when DATABASE_URL is not provided.
+// Enables zero-config
+const defaultDSN = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
+
+// newServeCommand starts the Archive gRPC server.
 func newServeCommand() *cobra.Command {
 
 	var port string
@@ -45,16 +48,16 @@ func newServeCommand() *cobra.Command {
 
 			ctx := cmd.Context()
 
-			lis, err := net.Listen("tcp", ":"+port)
-			if err != nil {
-				return fmt.Errorf("listen: %w", err)
-			}
-
+			// Resolve database DSN
 			dsn := os.Getenv("DATABASE_URL")
 			if dsn == "" {
-				return fmt.Errorf("DATABASE_URL is not set")
+				dsn = defaultDSN
+				zap.L().Warn("DATABASE_URL not set, using default",
+					zap.String("dsn", dsn),
+				)
 			}
 
+			// Open database connection
 			db, err := sql.Open("pgx", dsn)
 			if err != nil {
 				return fmt.Errorf("open database: %w", err)
@@ -65,33 +68,49 @@ func newServeCommand() *cobra.Command {
 				}
 			}()
 
-			if err := db.Ping(); err != nil {
-				return fmt.Errorf("ping database: %w", err)
+			// Ensure DB is reachable with retry
+			if err := archive.WaitForDB(ctx, db); err != nil {
+				return fmt.Errorf("database not ready: %w", err)
 			}
 
-			if err := archive.InitSchema(ctx, db); err != nil {
+			// Initialize archive service
+			arch := archive.New(db)
+
+			// Ensure schema exists
+			if err := arch.InitSchema(ctx); err != nil {
 				return fmt.Errorf("init schema: %w", err)
 			}
 
-			repo := archive.NewPostgresRepository(db)
+			// Start TCP listener
+			lis, err := net.Listen("tcp", ":"+port)
+			if err != nil {
+				return fmt.Errorf("listen: %w", err)
+			}
 
+			// Create gRPC server
 			grpcServer := grpc.NewServer()
 
-			archivepb.RegisterArchiveServiceServer(grpcServer, &grpcserver.ArchiveServer{
-				Repo: repo,
-			})
+			// Register ArchiveService
+			incidentpb.RegisterArchiveServiceServer(
+				grpcServer,
+				grpcserver.NewArchiveServer(arch),
+			)
 
-			zap.L().Info("archive service running", zap.String("port", port))
+			zap.L().Info("archive service running",
+				zap.String("port", port))
 
+			// Start server in background
 			go func() {
 				if err := grpcServer.Serve(lis); err != nil {
 					zap.L().Error("grpc server error", zap.Error(err))
 				}
 			}()
 
+			// Wait for shutdown signal
 			<-ctx.Done()
 
-			log.Println("shutting down Archive server")
+			zap.L().Info("shutting down archive server")
+
 			grpcServer.GracefulStop()
 
 			return nil

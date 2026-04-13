@@ -7,38 +7,76 @@ option go_package = "github.com/ghdrope/court/proto/incidentpb";
 // ContainerIssue represents a failure or abnormal state detected
 // in a specific container within a Pod.
 message ContainerIssue {
+  // container is the name of the container within the Pod.
   string container = 1;
+
+  // reason is the raw Kubernetes termination reason
   string reason = 2;
+
+  // logs contains a snapshot of container logs relevant
+  // to the failure condition.
+  repeated string logs = 3;
 }
 
-// IncidentReport describes a detected Pod failure event produced by the Officer.
-// It contains metadata about the Pod, its current state, and any container-level issues.
-message IncidentReport {
-  string id = 1;
-  string pod_name = 2;
-  string namespace = 3;
-  string phase = 4;
-  string reason = 5;
+// K8sEvent represents a Kubernetes event associated with the Pod.
+//
+// These events provide primary diagnostic context for the incident
+// and are used to understand cluster-level state transitions.
+message K8sEvent {
+  // type is the event type
+  string type = 1;
 
-  // container_issues lists detected runtime issues for containers in the Pod.
+  // reason is the Kubernetes event reason
+  string reason = 2;
+
+  // message is the human-readable event description.
+  string message = 3;
+}
+
+// IncidentReport is the representation of a detected Pod failure
+// produced by the Officer component.
+//
+// It is the single source of a Kubernetes workload failure.
+message IncidentReport {
+  // id uniquely identifies the incident event.
+  string id = 1;
+
+  // cluster is the name of the Kubernetes cluster where the Pod ran.
+  string cluster = 2;
+
+  // namespace is the Kubernetes namespace of the Pod.
+  string namespace = 3;
+
+  // pod is the name of the Kubernetes Pod that failed.
+  string pod = 4;
+
+  // events contains Kubernetes events related to the Pod lifecycle
+  // and failure context.
+  repeated K8sEvent events = 5;
+
+  // container_issues contains detected issues at container level.
   repeated ContainerIssue container_issues = 6;
 
-  // logs contains a limited snapshot of relevant Pod logs.
-  repeated string logs = 7;
+  // prosecutor_commentary is filled by prosecutor after the initial
+  // incident creation.
+  string prosecutor_commentary = 7;
 }
 
-// Ack represents a simple acknowledgment response returned by the API server.
-// It indicates whether the incident was successfully received and forwarded.
+// Ack represents a simple acknowledgment returned by the Archive service.
+//
+// It indicates whether the incident was successfully received and persisted.
 message Ack {
+  // success indicates whether the operation completed successfully.
   bool success = 1;
 }
 
-// IncidentService defines the gRPC API for reporting incidents.
-// It acts as the entry point for Officer components to send IncidentReports
-// into the system for routing and further processing.
-service IncidentService {
+// ArchiveService is the ingestion endpoint for IncidentReports.
+//
+// It receives incidents directly from the Officer component and is responsible
+// for persistence, indexing, and downstream processing.
+service ArchiveService {
 
-  // ReportIncident receives an IncidentReport from the Officer
-  // and triggers downstream processing.
-  rpc ReportIncident(IncidentReport) returns (Ack);
+  // ReceiveStoreIncident receives a fully-formed IncidentReport from the Officer
+  // and persists it into the Archive system.
+  rpc ReceiveStoreIncident(IncidentReport) returns (Ack);
 }

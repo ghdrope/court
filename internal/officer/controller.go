@@ -20,31 +20,36 @@ import (
 	"context"
 
 	"github.com/ghdrope/court/internal/incident"
-	"github.com/ghdrope/court/internal/router"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	pb "github.com/ghdrope/court/proto/incident"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// PodReconciler reconciles Pod resources and produces IncidentReports,
+// ArchiveClient defines the contract for sending IncidentReports
+// to the Archive service.
+type ArchiveClient interface {
+	Send(ctx context.Context, r *incident.IncidentReport) error
+}
+
+// PodReconciler reconciles Pod resources and produces IncidentReports
 // for workloads that match known failure conditions.
 type PodReconciler struct {
 	client.Client
 	Log logr.Logger
 
-	API router.IncidentSender
+	Archive ArchiveClient
+
+	Cluster string
 }
 
 // Reconcile evaluates the current state of a Pod and determines whether
 // it should generate an IncidentReport.
-//
-// A report is created when:
-//   - the Pod is in a failed/unknown phase OR
-//   - container-level issues are detected by the inspector
-func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *PodReconciler) Reconcile(
+	ctx context.Context,
+	req ctrl.Request,
+) (ctrl.Result, error) {
 
 	logger := r.Log.WithValues(
 		"namespace", req.Namespace,
@@ -58,7 +63,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Inspect container-level issues such as CrashLoopBackOff or OOMKilled.
+	// Detect container-level issues
 	containerIssues := DetectContainerIssues(&pod)
 
 	isProblem :=
@@ -70,10 +75,11 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	// Build a structured incident report from the Pod state.
+	// Build domain-level incident report
 	report, err := incident.BuildFromPod(
 		&pod,
-		nil,
+		r.Cluster,
+		nil, // events (TBD),
 		containerIssues,
 	)
 	if err != nil {
@@ -81,22 +87,10 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	// Map domain report to protobuf format
-	pbReport := &pb.IncidentReport{
-		Id:        report.ID,
-		Namespace: report.Namespace,
-	}
-
-	for _, ci := range report.ContainerIssues {
-		pbReport.ContainerIssues = append(pbReport.ContainerIssues, &pb.ContainerIssue{
-			Container: ci.Container,
-			Reason:    ci.Reason,
-		})
-	}
-
 	logger.Info("sending incident", "id", report.ID)
 
-	if err := r.API.Send(ctx, pbReport); err != nil {
+	// Send to Archive service
+	if err := r.Archive.Send(ctx, &report); err != nil {
 		logger.Error(err, "failed to send incident")
 		return ctrl.Result{}, err
 	}

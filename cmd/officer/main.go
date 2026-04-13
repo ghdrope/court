@@ -25,11 +25,10 @@ import (
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+// main initializes logging, signal handling, and executes the CLI.
 func main() {
-	// Setup a context that is automatically cancelled on SIGINT/SIGTERM.
 	ctx := signals.SetupSignalHandler()
 
-	// Initialize global logger
 	logger, err := zap.NewProduction()
 	if err != nil {
 		panic(err)
@@ -38,13 +37,12 @@ func main() {
 		_ = logger.Sync()
 	}()
 
-	// set global zap logger
+	// Global logger
 	zap.ReplaceGlobals(logger)
 
-	// set controller-runtime logger
+	// controller-runtime logger
 	ctrl.SetLogger(ctrlzap.New(ctrlzap.UseDevMode(false)))
 
-	// Execute CLI
 	if err := Execute(ctx); err != nil {
 		zap.L().Error("fatal error", zap.Error(err))
 		os.Exit(1)

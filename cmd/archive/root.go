@@ -22,18 +22,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd is the base command for the Archive.
+// rootCmd is the base command for the Archive service.
 var rootCmd = &cobra.Command{
 	Use:   "archive",
 	Short: "Archive service for Court persistence",
-	Long:  "Archive is a gRPC service responsible for storing Court stateful items.",
+	Long:  "Archive is a gRPC service responsible for storing Court stateful data.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.HelpFunc()(cmd, args)
 	},
 }
 
-// Execute runs the CLI.
+// Execute runs the CLI with the provided context.
 func Execute(ctx context.Context) error {
 	return rootCmd.ExecuteContext(ctx)
 }
