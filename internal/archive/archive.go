@@ -27,12 +27,15 @@ import (
 
 // Archive provides access to persistence operations.
 type Archive struct {
-	DB *sql.DB
+	DB        *sql.DB
+	Publisher EventPublisher
 }
 
 // New creates a new Archive instance backed by PostgreSQL.
-func New(db *sql.DB) *Archive {
-	return &Archive{DB: db}
+func New(db *sql.DB, publisher EventPublisher) *Archive {
+	return &Archive{
+		DB:        db,
+		Publisher: publisher}
 }
 
 // WaitForDB retries database connectivity until success or context cancellation.

@@ -82,20 +82,25 @@ func newArchiveCommand() *cobra.Command {
 				return fmt.Errorf("database not ready: %w", err)
 			}
 
-			// Initialize archive service
-			arch := archive.New(db)
-
-			// Ensure schema exists
-			if err := arch.InitSchema(ctx); err != nil {
-				return fmt.Errorf("init schema: %w", err)
-			}
-
 			rdb := redis.NewClient(&redis.Options{
 				Addr: redisAddr,
 			})
 
 			baseClient := redisstream.NewClient(rdb)
+
+			// inbound stream (Officer -> Archive)
 			incidentClient := redisstream.NewIncidentStreamClient(baseClient)
+
+			// outbound stream (Archive -> Prosecutor)
+			prosecutorClient := redisstream.NewProsecutorStreamClient(baseClient)
+
+			// Archive now uses generic publisher
+			arch := archive.New(db, prosecutorClient)
+
+			// Ensure schema exists
+			if err := arch.InitSchema(ctx); err != nil {
+				return fmt.Errorf("init schema: %w", err)
+			}
 
 			if err := incidentClient.EnsureGroup(ctx); err != nil {
 				return err
