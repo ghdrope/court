@@ -16,14 +16,22 @@ limitations under the License.
 
 package prosecutor
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+
+	"github.com/ghdrope/court/internal/archive"
+)
 
 // Service handles post-processing over items previously persisted in
 // the Archive.
 //
 // It is responsible for enriching stored data.
 type Service struct {
-	DB *sql.DB
+	DB        *sql.DB
+	Publisher interface {
+		PublishStored(context.Context, archive.StoredEvent) error
+	}
 }
 
 // New creates a new Prosecutor service backed by the given database.

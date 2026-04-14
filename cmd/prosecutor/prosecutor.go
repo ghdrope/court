@@ -87,8 +87,11 @@ func newProsecutorCommand() *cobra.Command {
 				return err
 			}
 
+			courtClient := redisstream.NewCourtStreamClient(client)
+
 			// Initialize prosecutor service
 			svc := prosecutor.New(db)
+			svc.Publisher = courtClient
 
 			zap.L().Info("prosecutor worker started")
 
