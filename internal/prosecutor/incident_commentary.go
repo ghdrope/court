@@ -19,7 +19,9 @@ package prosecutor
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/ghdrope/court/internal/archive"
 	"github.com/ghdrope/court/internal/incident"
 )
 
@@ -48,12 +50,7 @@ func (s *Service) ProcessIncident(
 		WHERE event_id = $2
 	`
 
-	res, err := s.DB.ExecContext(
-		ctx,
-		query,
-		commentary,
-		r.ID,
-	)
+	res, err := s.DB.ExecContext(ctx, query, commentary, r.ID)
 	if err != nil {
 		return fmt.Errorf("update incident commentary: %w", err)
 	}
@@ -65,6 +62,23 @@ func (s *Service) ProcessIncident(
 
 	if rows == 0 {
 		return fmt.Errorf("incident not found for id=%s", r.ID)
+	}
+
+	// Emit downstream event for Court
+	if s.Publisher != nil {
+
+		event := archive.StoredEvent{
+			Type: "prosecutor.finished",
+			Payload: map[string]any{
+				"incident_id": r.ID,
+				"cluster":     r.Cluster,
+				"namespace":   r.Namespace,
+				"pod":         r.Pod,
+				"timestamp":   time.Now().UTC(),
+			},
+		}
+
+		_ = s.Publisher.PublishStored(ctx, event)
 	}
 
 	return nil
