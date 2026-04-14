@@ -53,10 +53,8 @@ func initIncidentSchema(ctx context.Context, db *sql.DB) error {
 	return err
 }
 
-// StoreIncident persists an IncidentReport into the archive.
-//
-// It converts the domain model into a storage-friendly format
-// and writes it into PostgreSQL.
+// StoreIncident persists an IncidentReport into the Archive
+// and emits a generic "stored" event.
 func (a *Archive) StoreIncident(
 	ctx context.Context,
 	r *incident.IncidentReport,
@@ -105,6 +103,16 @@ func (a *Archive) StoreIncident(
 
 	if err != nil {
 		return fmt.Errorf("insert incident: %w", err)
+	}
+
+	// Emit generic stored event
+	if a.Publisher != nil {
+		event := StoredEvent{
+			Type:    "incident.stored",
+			Payload: r,
+		}
+
+		_ = a.Publisher.PublishStored(ctx, event)
 	}
 
 	return nil
