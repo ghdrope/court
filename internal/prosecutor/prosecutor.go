@@ -14,32 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package prosecutor
 
-import (
-	"os"
+import "database/sql"
 
-	"go.uber.org/zap"
-	"k8s.io/sample-controller/pkg/signals"
-)
+// Service handles post-processing over items previously persisted in
+// the Archive.
+//
+// It is responsible for enriching stored data.
+type Service struct {
+	DB *sql.DB
+}
 
-// main initializes logging, signal handling, and executes the CLI.
-func main() {
-	ctx := signals.SetupSignalHandler()
-
-	logger, err := zap.NewProduction()
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		_ = logger.Sync()
-	}()
-
-	// Global logger
-	zap.ReplaceGlobals(logger)
-
-	if err := Execute(ctx); err != nil {
-		zap.L().Error("fatal error", zap.Error(err))
-		os.Exit(1)
-	}
+// New creates a new Prosecutor service backed by the given database.
+func New(db *sql.DB) *Service {
+	return &Service{DB: db}
 }

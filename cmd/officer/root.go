@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd is the base CLI command for the Officer
+// rootCmd is the base CLI command for the Officer.
 var rootCmd = &cobra.Command{
 	Use:   "officer",
 	Short: "Court Officer CLI",
