@@ -80,14 +80,14 @@ func newProsecutorCommand() *cobra.Command {
 				Addr: redisAddr,
 			})
 
-			client := redisstream.NewClient(rdb)
+			client := redisstream.NewProsecutorStreamClient(rdb)
 
 			// Ensure consumer group exists
-			if err := client.EnsureProsecutorGroup(ctx); err != nil {
+			if err := redisstream.EnsureProsecutorGroup(ctx, rdb); err != nil {
 				return err
 			}
 
-			courtClient := redisstream.NewCourtStreamClient(client)
+			courtClient := redisstream.NewCourtStreamClient(rdb)
 
 			// Initialize prosecutor service
 			svc := prosecutor.New(db)

@@ -23,7 +23,7 @@ import (
 
 	"github.com/ghdrope/court/internal/archive"
 	"github.com/ghdrope/court/internal/court"
-	"github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -36,12 +36,12 @@ const (
 
 // CourtStreamClient publishes prosecutor completion events.
 type CourtStreamClient struct {
-	*Client
+	rdb *goredis.Client
 }
 
 // NewCourtStreamClient creates a new court stream publisher.
-func NewCourtStreamClient(base *Client) *CourtStreamClient {
-	return &CourtStreamClient{Client: base}
+func NewCourtStreamClient(rdb *goredis.Client) *CourtStreamClient {
+	return &CourtStreamClient{rdb: rdb}
 }
 
 // PublishedStored emits a prosecutor.finished event.
@@ -55,7 +55,7 @@ func (c *CourtStreamClient) PublishStored(
 		return fmt.Errorf("marshal court event: %w", err)
 	}
 
-	if err := c.rdb.XAdd(ctx, &redis.XAddArgs{
+	if err := c.rdb.XAdd(ctx, &goredis.XAddArgs{
 		Stream: CourtStream,
 		Values: map[string]any{
 			"payload": string(data),
@@ -68,16 +68,16 @@ func (c *CourtStreamClient) PublishStored(
 }
 
 // EnsureCourtGroup ensures Redis consumer group exists.
-func (c *Client) EnsureCourtGroup(ctx context.Context) error {
+func EnsureCourtGroup(ctx context.Context, rdb *goredis.Client) error {
 
-	err := c.rdb.XGroupCreateMkStream(
+	err := rdb.XGroupCreateMkStream(
 		ctx,
 		CourtStream,
 		CourtGroup,
 		"0",
 	).Err()
 
-	if err != nil && err != redis.Nil && !isBusyGroup(err) {
+	if err != nil && err != goredis.Nil && !isBusyGroup(err) {
 		return fmt.Errorf("create court group: %w", err)
 	}
 
@@ -86,7 +86,7 @@ func (c *Client) EnsureCourtGroup(ctx context.Context) error {
 
 // ConsumerCourtloop processes prosecutor.finished events
 // and creates formal legal cases.
-func (c *Client) ConsumeCourtLoop(
+func (c *CourtStreamClient) ConsumeCourtLoop(
 	ctx context.Context,
 	svc *court.Service,
 ) error {
@@ -94,7 +94,7 @@ func (c *Client) ConsumeCourtLoop(
 	logger := zap.L().With(zap.String("component", "court-consumer"))
 
 	for {
-		res, err := c.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
+		res, err := c.rdb.XReadGroup(ctx, &goredis.XReadGroupArgs{
 			Group:    CourtGroup,
 			Consumer: CourtConsumer,
 			Streams:  []string{CourtStream, ">"},

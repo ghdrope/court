@@ -14,16 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package redisstream
+package redis
 
-import "github.com/redis/go-redis/v9"
+import goredis "github.com/redis/go-redis/v9"
 
-// Client is a wrapper over Redis client.
-type Client struct {
-	rdb *redis.Client
-}
-
-// NewClient creates a new Redis Stream client wrapper.
-func NewClient(rdb *redis.Client) *Client {
-	return &Client{rdb: rdb}
+// New Client creates a new Redis client.
+func NewClient(opts *goredis.Options) *goredis.Client {
+	return goredis.NewClient(opts)
 }

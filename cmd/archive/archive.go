@@ -86,13 +86,11 @@ func newArchiveCommand() *cobra.Command {
 				Addr: redisAddr,
 			})
 
-			baseClient := redisstream.NewClient(rdb)
-
 			// inbound stream (Officer -> Archive)
-			incidentClient := redisstream.NewIncidentStreamClient(baseClient)
+			incidentClient := redisstream.NewIncidentStreamClient(rdb)
 
 			// outbound stream (Archive -> Prosecutor)
-			prosecutorClient := redisstream.NewProsecutorStreamClient(baseClient)
+			prosecutorClient := redisstream.NewProsecutorStreamClient(rdb)
 
 			// Archive now uses generic publisher
 			arch := archive.New(db, prosecutorClient)

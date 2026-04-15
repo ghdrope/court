@@ -24,7 +24,7 @@ import (
 	"github.com/ghdrope/court/internal/archive"
 	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/prosecutor"
-	"github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -38,12 +38,12 @@ const (
 // ProsecutorStreamClient publishes stored events
 // to Prosecutor service.
 type ProsecutorStreamClient struct {
-	*Client
+	rdb *goredis.Client
 }
 
 // NewProsecutorStreamClient creates a new instance.
-func NewProsecutorStreamClient(base *Client) *ProsecutorStreamClient {
-	return &ProsecutorStreamClient{Client: base}
+func NewProsecutorStreamClient(rdb *goredis.Client) *ProsecutorStreamClient {
+	return &ProsecutorStreamClient{rdb: rdb}
 }
 
 // PublishStored publishes a generic stored event.
@@ -57,7 +57,7 @@ func (c *ProsecutorStreamClient) PublishStored(
 		return fmt.Errorf("marshal stored event: %w", err)
 	}
 
-	if err := c.rdb.XAdd(ctx, &redis.XAddArgs{
+	if err := c.rdb.XAdd(ctx, &goredis.XAddArgs{
 		Stream: ProsecutorStream,
 		Values: map[string]any{
 			"payload": string(data),
@@ -71,16 +71,16 @@ func (c *ProsecutorStreamClient) PublishStored(
 
 // EnsureProsecutorGroup ensures that the Redis consumer group exists
 // for the prosecutor stream.
-func (c *Client) EnsureProsecutorGroup(ctx context.Context) error {
+func EnsureProsecutorGroup(ctx context.Context, rdb *goredis.Client) error {
 
-	err := c.rdb.XGroupCreateMkStream(
+	err := rdb.XGroupCreateMkStream(
 		ctx,
 		ProsecutorStream,
 		ProsecutorGroup,
 		"0",
 	).Err()
 
-	if err != nil && err != redis.Nil && !isBusyGroup(err) {
+	if err != nil && err != goredis.Nil && !isBusyGroup(err) {
 		return fmt.Errorf("create prosecutor group: %w", err)
 	}
 
@@ -89,7 +89,7 @@ func (c *Client) EnsureProsecutorGroup(ctx context.Context) error {
 
 // ConsumeProsecutorLoop consumes consumes StoredEvent messages
 // from Redis Stream and delegates processing to the Prosecutor.
-func (c *Client) ConsumeProsecutorLoop(
+func (c *ProsecutorStreamClient) ConsumeProsecutorLoop(
 	ctx context.Context,
 	svc *prosecutor.Service,
 ) error {
@@ -97,7 +97,7 @@ func (c *Client) ConsumeProsecutorLoop(
 	logger := zap.L().With(zap.String("component", "prosecutor-consumer"))
 
 	for {
-		res, err := c.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
+		res, err := c.rdb.XReadGroup(ctx, &goredis.XReadGroupArgs{
 			Group:    ProsecutorGroup,
 			Consumer: ProsecutorConsumer,
 			Streams:  []string{ProsecutorStream, ">"},

@@ -73,12 +73,9 @@ func newPatrolCommand() *cobra.Command {
 			rdb := redis.NewClient(&redis.Options{
 				Addr: redisAddr,
 			})
-			baseClient := redisstream.NewClient(rdb)
 
 			// Domain-specific stream client
-			incidentClient := redisstream.IncidentStreamClient{
-				Client: baseClient,
-			}
+			incidentClient := redisstream.NewIncidentStreamClient(rdb)
 
 			// Register Kubernetes API scheme
 			scheme := runtime.NewScheme()
@@ -99,7 +96,7 @@ func newPatrolCommand() *cobra.Command {
 			reconciler := &officer.PodReconciler{
 				Client:  mgr.GetClient(),
 				Log:     log.Log.WithName("reconciler"),
-				Archive: &incidentClient,
+				Archive: incidentClient,
 				Cluster: clusterName,
 			}
 

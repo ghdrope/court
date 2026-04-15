@@ -23,7 +23,7 @@ import (
 
 	"github.com/ghdrope/court/internal/archive"
 	"github.com/ghdrope/court/internal/incident"
-	"github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -34,15 +34,14 @@ const (
 	IncidentConsumer = "archive-1"
 )
 
-// IncidentStreamClient implements publishing and consuming logic
-// for IncidentReport events.
+// IncidentStreamClient handles publishing and consuming incident events.
 type IncidentStreamClient struct {
-	*Client
+	rdb *goredis.Client
 }
 
 // NewIncidentStreamClient creates a new incident stream client.
-func NewIncidentStreamClient(base *Client) *IncidentStreamClient {
-	return &IncidentStreamClient{Client: base}
+func NewIncidentStreamClient(rdb *goredis.Client) *IncidentStreamClient {
+	return &IncidentStreamClient{rdb: rdb}
 }
 
 // PublishIncident publishes an IncidentReport into Redis Stream.
@@ -56,7 +55,7 @@ func (c *IncidentStreamClient) PublishIncident(
 		return fmt.Errorf("marshal incident: %w", err)
 	}
 
-	if err = c.rdb.XAdd(ctx, &redis.XAddArgs{
+	if err = c.rdb.XAdd(ctx, &goredis.XAddArgs{
 		Stream: IncidentStream,
 		Values: map[string]any{
 			"payload": string(data),
@@ -68,8 +67,7 @@ func (c *IncidentStreamClient) PublishIncident(
 	return nil
 }
 
-// Send implements officer.ArchiveClient interface.
-// Keeps Officer decoupled from transport implementation.
+// Send implements external interface for decoupling producer logic
 func (c *IncidentStreamClient) Send(
 	ctx context.Context,
 	r *incident.IncidentReport,
@@ -77,8 +75,7 @@ func (c *IncidentStreamClient) Send(
 	return c.PublishIncident(ctx, r)
 }
 
-// EnsureGroup ensures that the Redis consumer group exists.
-// Safe to call multiple times.
+// EnsureGroup ensures Redis consumer group exists (idempotent).
 func (c *IncidentStreamClient) EnsureGroup(ctx context.Context) error {
 
 	err := c.rdb.XGroupCreateMkStream(
@@ -88,7 +85,7 @@ func (c *IncidentStreamClient) EnsureGroup(ctx context.Context) error {
 		"0",
 	).Err()
 
-	if err != nil && err != redis.Nil && !isBusyGroup(err) {
+	if err != nil && err != goredis.Nil && !isBusyGroup(err) {
 		return fmt.Errorf("create group: %w", err)
 	}
 
@@ -110,7 +107,7 @@ func (c *IncidentStreamClient) ConsumeLoop(
 	logger := zap.L().With(zap.String("component", "incident-stream"))
 
 	for {
-		res, err := c.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
+		res, err := c.rdb.XReadGroup(ctx, &goredis.XReadGroupArgs{
 			Group:    IncidentGroup,
 			Consumer: IncidentConsumer,
 			Streams:  []string{IncidentStream, ">"},

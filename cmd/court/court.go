@@ -79,10 +79,10 @@ func newCourtCommand() *cobra.Command {
 				Addr: redisAddr,
 			})
 
-			client := redisstream.NewClient(rdb)
+			courtClient := redisstream.NewCourtStreamClient(rdb)
 
 			// Ensure consumer group exists
-			if err := client.EnsureCourtGroup(ctx); err != nil {
+			if err := redisstream.EnsureCourtGroup(ctx, rdb); err != nil {
 				return err
 			}
 
@@ -92,7 +92,7 @@ func newCourtCommand() *cobra.Command {
 			zap.L().Info("prosecutor worker started")
 
 			// Start consuming events
-			return client.ConsumeCourtLoop(ctx, svc)
+			return courtClient.ConsumeCourtLoop(ctx, svc)
 		},
 	}
 
