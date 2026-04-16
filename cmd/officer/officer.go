@@ -38,8 +38,10 @@ import (
 // defaultArchiveAddr provides zero-config.
 const defaultRedisAddr = "localhost:6379"
 
-// newPatrolCommand starts the k8s controller loop.
-func newPatrolCommand() *cobra.Command {
+// newOfficerCommand starts the k8s officer controller.
+//
+// It watches Pods and publishes incident events into Redis.
+func newOfficerCommand() *cobra.Command {
 
 	var redisAddr string
 	var clusterName string

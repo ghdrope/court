@@ -22,11 +22,12 @@ import (
 	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
 	"github.com/ghdrope/court/internal/archive"
 	redisstream "github.com/ghdrope/court/internal/transport/redis"
+	"github.com/ghdrope/court/pkg/redis"
 	"github.com/spf13/cobra"
 )
 
@@ -36,6 +37,9 @@ const defaultRedisAddr = "localhost:6379"
 const defaultDSN = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
 
 // newArchiveCommand starts the Archive service.
+//
+// It consumes incident and suit events, persists them, and publishes
+// stored events for downstream services.
 func newArchiveCommand() *cobra.Command {
 
 	var redisAddr string
@@ -46,6 +50,7 @@ func newArchiveCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			ctx := cmd.Context()
+			logger := zap.L().With(zap.String("component", "archive"))
 
 			// Resolve Redis address
 			if redisAddr == "" {
@@ -73,7 +78,7 @@ func newArchiveCommand() *cobra.Command {
 			}
 			defer func() {
 				if err := db.Close(); err != nil {
-					zap.L().Error("failed to close db", zap.Error(err))
+					logger.Error("failed to close db", zap.Error(err))
 				}
 			}()
 
@@ -82,13 +87,10 @@ func newArchiveCommand() *cobra.Command {
 				return fmt.Errorf("database not ready: %w", err)
 			}
 
-			rdb := redis.NewClient(&redis.Options{
-				Addr: redisAddr,
-			})
+			rdb := redis.NewClient(&goredis.Options{Addr: redisAddr})
 
 			// inbound stream (Officer -> Archive)
 			incidentClient := redisstream.NewIncidentStreamClient(rdb)
-
 			// outbound stream (Archive -> Prosecutor)
 			prosecutorClient := redisstream.NewProsecutorStreamClient(rdb)
 
@@ -100,13 +102,14 @@ func newArchiveCommand() *cobra.Command {
 				return fmt.Errorf("init schema: %w", err)
 			}
 
-			if err := incidentClient.EnsureGroup(ctx); err != nil {
+			// Ensure consumer group exists before consuming
+			if err := incidentClient.Client.EnsureGroup(ctx); err != nil {
 				return err
 			}
 
-			zap.L().Info("archive worker started")
+			logger.Info("archive worker started")
 
-			return incidentClient.ConsumeLoop(ctx, arch)
+			return incidentClient.ConsumeIncident(ctx, arch)
 		},
 	}
 
