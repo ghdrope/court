@@ -50,9 +50,14 @@ func TestBuildFromPod_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Validate ID generation
+	// ID should follow namespace/pod/uid pattern
 	if report.ID == "" {
 		t.Error("expected non-empty ID")
+	}
+
+	expectedPrefix := "default/pod-1/"
+	if len(report.ID) < len(expectedPrefix) {
+		t.Errorf("unexpected ID format: got %s", report.ID)
 	}
 
 	if report.Cluster != cluster {
@@ -181,6 +186,11 @@ func TestBuildFromPod_TableDriven(t *testing.T) {
 					tt.podName,
 					report.Pod,
 				)
+			}
+
+			// ID must always include namespace and pod
+			if report.Namespace != tt.namespace || report.Pod != tt.podName {
+				t.Errorf("invalid identity mapping in report")
 			}
 		})
 	}

@@ -19,7 +19,6 @@ package incident
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -28,6 +27,10 @@ import (
 //
 // This function acts as a translation layer between Kubernetes
 // runtime state and the IncidentReport model.
+//
+// The resulting IncidentReport contains only data available at the
+// Officer stage. Prosecutor-specific fields (Analysis) are left empty
+// and are expected to be populated in a later processing phase.
 func BuildFromPod(
 	pod *v1.Pod,
 	cluster string,
@@ -40,7 +43,8 @@ func BuildFromPod(
 	}
 
 	return IncidentReport{
-		ID: uuid.NewString(),
+		//Use namespace/name + UID to guarantee uniqueness across time
+		ID: fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, pod.UID),
 
 		// Target workload identity
 		Cluster:   cluster,
@@ -52,5 +56,8 @@ func BuildFromPod(
 
 		// Container-level evidence
 		ContainerIssues: containerIssues,
+
+		// Prosecutor analysis is not available at Officer stage
+		Analysis: nil,
 	}, nil
 }
