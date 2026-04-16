@@ -17,8 +17,14 @@ limitations under the License.
 package officer
 
 import (
+	"bufio"
+	"bytes"
+	"context"
+	"io"
+
 	"github.com/ghdrope/court/internal/incident"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // DetectContainerIssues analyses the container statuses of a Pod
@@ -27,7 +33,7 @@ import (
 // - CrashLoopBackOff,
 // - ImagePullBackOff
 // - OOMKilled
-func DetectContainerIssues(pod *v1.Pod) []incident.ContainerIssue {
+func DetectContainerIssues(ctx context.Context, client kubernetes.Interface, pod *v1.Pod) []incident.ContainerIssue {
 
 	if pod == nil {
 		return nil
@@ -38,11 +44,25 @@ func DetectContainerIssues(pod *v1.Pod) []incident.ContainerIssue {
 	for _, cs := range pod.Status.ContainerStatuses {
 
 		add := func(reason string) {
-			issues = append(issues, incident.ContainerIssue{
+
+			issue := incident.ContainerIssue{
 				Container: cs.Name,
 				Reason:    reason,
-				Logs:      nil,
-			})
+			}
+
+			// Only fetch logs if issue is meaningful
+			// (avoid overhead for healthy containers)
+			if pod.Namespace != "" {
+				issue.Logs = fetchContainerLogs(
+					ctx,
+					client,
+					pod.Namespace,
+					pod.Name,
+					cs.Name,
+				)
+			}
+
+			issues = append(issues, issue)
 		}
 
 		// Detect containers stuck in waiting states due to runtime issues.
@@ -60,4 +80,45 @@ func DetectContainerIssues(pod *v1.Pod) []incident.ContainerIssue {
 	}
 
 	return issues
+}
+
+// fetchContainerLogs retrieves the last 200 log lines for a container.
+func fetchContainerLogs(
+	ctx context.Context,
+	client kubernetes.Interface,
+	namespace string,
+	pod string,
+	container string,
+) []string {
+
+	const maxLines = 200
+
+	req := client.CoreV1().
+		Pods(namespace).
+		GetLogs(pod, &v1.PodLogOptions{
+			Container: container,
+		})
+
+	stream, err := req.Stream(ctx)
+	if err != nil {
+		return nil
+	}
+	defer stream.Close()
+
+	var buffer bytes.Buffer
+	_, _ = io.Copy(&buffer, stream)
+
+	scanner := bufio.NewScanner(&buffer)
+
+	var lines []string
+
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	if len(lines) <= maxLines {
+		return lines
+	}
+
+	return lines[len(lines)-maxLines:]
 }

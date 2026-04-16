@@ -67,7 +67,7 @@ func (r *PodReconciler) Reconcile(
 	}
 
 	// Detect container-level issues
-	containerIssues := DetectContainerIssues(&pod)
+	containerIssues := DetectContainerIssues(ctx, r.KubeClient, &pod)
 
 	events, err := r.fetchPodEvents(ctx, pod.Namespace, pod.Name)
 	if err != nil {
