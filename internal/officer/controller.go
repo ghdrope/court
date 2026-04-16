@@ -22,6 +22,7 @@ import (
 	"github.com/ghdrope/court/internal/incident"
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,6 +38,8 @@ type ArchiveClient interface {
 // for workloads that match known failure conditions.
 type PodReconciler struct {
 	client.Client
+	KubeClient kubernetes.Interface
+
 	Log logr.Logger
 
 	Archive ArchiveClient
@@ -66,6 +69,12 @@ func (r *PodReconciler) Reconcile(
 	// Detect container-level issues
 	containerIssues := DetectContainerIssues(&pod)
 
+	events, err := r.fetchPodEvents(ctx, pod.Namespace, pod.Name)
+	if err != nil {
+		logger.Error(err, "failed to fetch pod events")
+		return ctrl.Result{}, err
+	}
+
 	isProblem :=
 		pod.Status.Phase == v1.PodFailed ||
 			pod.Status.Phase == v1.PodUnknown ||
@@ -79,7 +88,7 @@ func (r *PodReconciler) Reconcile(
 	report, err := incident.BuildFromPod(
 		&pod,
 		r.Cluster,
-		nil, // events (TBD),
+		events,
 		containerIssues,
 	)
 	if err != nil {

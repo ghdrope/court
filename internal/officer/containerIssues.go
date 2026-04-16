@@ -22,10 +22,11 @@ import (
 )
 
 // DetectContainerIssues analyses the container statuses of a Pod
-// and returns a list of detected issues, such as CrashLoopBackOff,
-// ImagePullBackOff, or OOMKilled conditions.
+// and returns a list of detected issues such as:
 //
-// Does not perform logging and is intended solely as an inspection utility.
+// - CrashLoopBackOff,
+// - ImagePullBackOff
+// - OOMKilled
 func DetectContainerIssues(pod *v1.Pod) []incident.ContainerIssue {
 
 	if pod == nil {
@@ -40,14 +41,15 @@ func DetectContainerIssues(pod *v1.Pod) []incident.ContainerIssue {
 			issues = append(issues, incident.ContainerIssue{
 				Container: cs.Name,
 				Reason:    reason,
+				Logs:      nil,
 			})
 		}
 
 		// Detect containers stuck in waiting states due to runtime issues.
 		if cs.State.Waiting != nil {
-			switch reason := cs.State.Waiting.Reason; reason {
+			switch cs.State.Waiting.Reason {
 			case "CrashLoopBackOff", "ImagePullBackOff":
-				add(reason)
+				add(cs.State.Waiting.Reason)
 			}
 		}
 

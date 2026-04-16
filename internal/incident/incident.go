@@ -34,8 +34,6 @@ type IncidentReport struct {
 
 	// ContainerIssues contains all containers in the Pod that are
 	// associated with the recognized failure condition.
-	//
-	// Each entry includes only relevant error state + logs.
 	ContainerIssues []ContainerIssue
 
 	// Analysis contains the Prosecutor's evaluation of the incident.
@@ -44,9 +42,19 @@ type IncidentReport struct {
 	Analysis *ProsecutorAnalysis
 }
 
-// K8sEvent represents a single Kubernetes event associated with the Pod.
+// K8sEvent represents a single Kubernetes event associated with a Pod.
 //
-// These events are the primary source of truth for diagnosing the failure.
+// This is a normalized version of kubectl describe output.
+//
+// Example transformation:
+//
+//	Normal  Pulling  Pulling image "app/latest"
+//	↓
+//	K8sEvent{
+//	    Type: "Normal",
+//	    Reason: "Pulling",
+//	    Message: "Pulling image \"app/latest\"",
+//	}
 type K8sEvent struct {
 	// Type of event (Normal, Warning, etc.)
 	Type string
