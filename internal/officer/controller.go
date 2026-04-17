@@ -21,6 +21,7 @@ import (
 
 	"github.com/ghdrope/court/internal/incident"
 	"github.com/go-logr/logr"
+	"github.com/redis/go-redis/v9"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,11 +39,12 @@ type ArchiveClient interface {
 // for workloads that match known failure conditions.
 type PodReconciler struct {
 	client.Client
+
 	KubeClient kubernetes.Interface
+	Log        logr.Logger
 
-	Log logr.Logger
-
-	Archive ArchiveClient
+	Repo *incident.Repository
+	RDB  *redis.Client
 
 	Cluster string
 }
@@ -69,7 +71,7 @@ func (r *PodReconciler) Reconcile(
 	// Detect container-level issues
 	containerIssues := DetectContainerIssues(ctx, r.KubeClient, &pod)
 
-	events, err := r.fetchPodEvents(ctx, pod.Namespace, pod.Name)
+	events, err := r.fetchPodEvents(ctx, pod.Namespace, &pod)
 	if err != nil {
 		logger.Error(err, "failed to fetch pod events")
 		return ctrl.Result{}, err
@@ -96,12 +98,30 @@ func (r *PodReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	logger.Info("sending incident", "id", report.ID)
+	logger.Info("incident detected",
+		"id", report.ID,
+		"cluster", report.Cluster,
+		"namespace", report.Namespace,
+		"pod", report.Pod,
+		"events", events,
+		"containerIssues", containerIssues,
+	)
 
-	// Send to Archive service
-	if err := r.Archive.Send(ctx, &report); err != nil {
-		logger.Error(err, "failed to send incident")
+	if err := r.Repo.Insert(ctx, &report); err != nil {
+		logger.Error(err, "failed to insert incident into postgres", "id", report.ID)
 		return ctrl.Result{}, err
+	}
+	logger.Info("incident stored in postgres",
+		"id", report.ID,
+	)
+
+	// Emit event
+	if err := r.RDB.Publish(ctx, "incident.created", report.ID).Err(); err != nil {
+		logger.Error(err, "failed to publish incident event", "id", report.ID)
+	} else {
+		logger.Info("incident event published",
+			"id", report.ID,
+		)
 	}
 
 	return ctrl.Result{}, nil
