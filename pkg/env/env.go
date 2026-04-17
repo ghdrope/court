@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package redisstream
+package env
 
-import "github.com/redis/go-redis/v9"
+import "os"
 
-// Client is a wrapper over Redis client.
-type Client struct {
-	rdb *redis.Client
-}
-
-// NewClient creates a new Redis Stream client wrapper.
-func NewClient(rdb *redis.Client) *Client {
-	return &Client{rdb: rdb}
+// Get returns the value of an environment variable.
+// If the variable is not set or is empty, it returns the provided default value.
+func Get(key string, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
 }

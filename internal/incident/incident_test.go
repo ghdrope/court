@@ -24,7 +24,7 @@ import (
 // correctly holds and exposes data without transformation or side effects.
 func TestIncidentReport_Structure(t *testing.T) {
 	report := IncidentReport{
-		ID: "test-id",
+		ID: "default/pod-1/uid-123",
 
 		Cluster:   "cluster-1",
 		Namespace: "default",
@@ -48,8 +48,8 @@ func TestIncidentReport_Structure(t *testing.T) {
 	}
 
 	// Validate identity
-	if report.ID != "test-id" {
-		t.Errorf("unexpected ID: got %s, want %s", report.ID, "test-id")
+	if report.ID != "default/pod-1/uid-123" {
+		t.Errorf("unexpected ID: got %s, want %s", report.ID, "default/pod-1/uid-123")
 	}
 
 	if report.Cluster != "cluster-1" {
@@ -108,7 +108,7 @@ func TestContainerIssue_Structure(t *testing.T) {
 	}
 
 	if ci.Container != "app" {
-		t.Errorf("unexpected container: got %s, want %s", ci.Container, "nginx")
+		t.Errorf("unexpected container: got %s, want %s", ci.Container, "app")
 	}
 
 	if ci.Reason != "OOMKilled" {

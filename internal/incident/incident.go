@@ -34,17 +34,27 @@ type IncidentReport struct {
 
 	// ContainerIssues contains all containers in the Pod that are
 	// associated with the recognized failure condition.
-	//
-	// Each entry includes only relevant error state + logs.
 	ContainerIssues []ContainerIssue
 
-	// Prosecutor post-processing (filled by Prosecutor, empty at Officer level)
-	ProsecutorCommentary string
+	// Analysis contains the Prosecutor's evaluation of the incident.
+	//
+	// Filled by Prosecutor, empty at Officer level
+	Analysis *ProsecutorAnalysis
 }
 
-// K8sEvent represents a single Kubernetes event associated with the Pod.
+// K8sEvent represents a single Kubernetes event associated with a Pod.
 //
-// These events are the primary source of truth for diagnosing the failure.
+// This is a normalized version of kubectl describe output.
+//
+// Example transformation:
+//
+//	Normal  Pulling  Pulling image "app/latest"
+//	↓
+//	K8sEvent{
+//	    Type: "Normal",
+//	    Reason: "Pulling",
+//	    Message: "Pulling image \"app/latest\"",
+//	}
 type K8sEvent struct {
 	// Type of event (Normal, Warning, etc.)
 	Type string
@@ -67,4 +77,16 @@ type ContainerIssue struct {
 
 	// Logs contains a bounded snapshot of container logs relevant to the failure.
 	Logs []string
+}
+
+// ProsecutorAnalysis represents the result of analysing an incident,
+// including contextual inputs and the generated commentary.
+type ProsecutorAnalysis struct {
+	// RelatedRepoURL points to the repository likely associated
+	// with the workload incident.
+	RelatedRepoURL string
+
+	// Commentary contains the human-readable analysis generated
+	// by the Prosecutor, LLM-based reasoning.
+	Commentary string
 }

@@ -14,30 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package testhelper
 
 import (
-	"context"
-
-	"github.com/spf13/cobra"
+	"database/sql"
+	"testing"
 )
 
-// rootCmd is the base CLI command for the Officer.
-var rootCmd = &cobra.Command{
-	Use:   "officer",
-	Short: "Court Officer CLI",
-	Long:  "Officer monitors Kubernetes workloads and reports incidents.",
-	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.HelpFunc()(cmd, args)
-	},
-}
-
-// Execute runs the CLI with context propagation.
-func Execute(ctx context.Context) error {
-	return rootCmd.ExecuteContext(ctx)
-}
-
-func init() {
-	rootCmd.AddCommand(newOfficerCommand())
+// CloseDB closes the database connection.
+func CloseDB(t *testing.T, db *sql.DB) {
+	t.Helper()
+	_ = db.Close()
 }

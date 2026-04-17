@@ -32,18 +32,22 @@ import (
 const defaultDSN = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
 const defaultRedisAddr = "localhost:6379"
 
-// newProsecutorCommand starts the Prosecutor worker loop.
+// newProsecutorCommand starts the Prosecutor worker.
+//
+// It consumes stored events and enriches them before forwarding
+// to the Court service.
 func newProsecutorCommand() *cobra.Command {
 
 	var redisAddr string
 
 	cmd := &cobra.Command{
 		Use:   "prosecutor",
-		Short: "Start Prosecutor event-processing loop",
+		Short: "Start Prosecutor worker",
 		Long:  "Prosecutor consumes stored events and enriches Court handled data.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			ctx := cmd.Context()
+			logger := zap.L().With(zap.String("component", "prosecutor"))
 
 			// Resolve database DSN
 			dsn := os.Getenv("DATABASE_URL")
@@ -66,7 +70,7 @@ func newProsecutorCommand() *cobra.Command {
 			}
 			defer func() {
 				if err := db.Close(); err != nil {
-					zap.L().Error("failed to close db", zap.Error(err))
+					logger.Error("failed to close db", zap.Error(err))
 				}
 			}()
 
@@ -76,27 +80,24 @@ func newProsecutorCommand() *cobra.Command {
 			}
 
 			// Create Redis client
-			rdb := redis.NewClient(&redis.Options{
-				Addr: redisAddr,
-			})
+			rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 
-			client := redisstream.NewClient(rdb)
+			client := redisstream.NewProsecutorStreamClient(rdb)
+			courtClient := redisstream.NewCourtStreamClient(rdb)
 
 			// Ensure consumer group exists
-			if err := client.EnsureProsecutorGroup(ctx); err != nil {
+			if err := client.Client.EnsureGroup(ctx); err != nil {
 				return err
 			}
-
-			courtClient := redisstream.NewCourtStreamClient(client)
 
 			// Initialize prosecutor service
 			svc := prosecutor.New(db)
 			svc.Publisher = courtClient
 
-			zap.L().Info("prosecutor worker started")
+			logger.Info("prosecutor worker started")
 
 			// Start consuming events
-			return client.ConsumeProsecutorLoop(ctx, svc)
+			return client.ConsumeProsecutor(ctx, svc)
 		},
 	}
 

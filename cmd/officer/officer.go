@@ -18,10 +18,11 @@ package main
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/officer"
-	redisstream "github.com/ghdrope/court/internal/transport/redis"
+	"github.com/ghdrope/court/pkg/env"
+	"github.com/ghdrope/court/pkg/postgres"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/spf13/cobra"
@@ -29,17 +30,28 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-// defaultArchiveAddr provides zero-config.
+const defaultClusterName = "local-cluster"
+const defaultDsnAddr = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
 const defaultRedisAddr = "localhost:6379"
 
-// newPatrolCommand starts the k8s controller loop.
-func newPatrolCommand() *cobra.Command {
+// newOfficerCommand initializes the Officer service.
+//
+// The Officer runs as a K8s controller responsible for:
+//   - Watching Pod lifecycle events
+//   - Detecting runtime failures
+//   - Building IncidentReports from cluster state
+//   - Persisting incidents into PostgreSQL
+//   - Publishing incident events to Redis for downstream consumers
+func newOfficerCommand() *cobra.Command {
 
 	var redisAddr string
 	var clusterName string
@@ -52,42 +64,52 @@ func newPatrolCommand() *cobra.Command {
 			logger := ctrl.Log.WithName("officer")
 			logger.Info("starting patrol controller")
 
-			// Resolve Cluster name
-			if clusterName == "" {
-				clusterName = os.Getenv("CLUSTER_NAME")
-				if clusterName == "" {
-					return fmt.Errorf("cluster name must be set via --cluster or CLUSTER_NAME")
-				}
+			// Resolve cluster identity.
+			// Used to uniquely identify the source Kubernetes environment.
+			clusterName := env.Get("CLUSTER_NAME", defaultClusterName)
+
+			// Resolve PostgreSQL connection string.
+			// Used for persisting IncidentReports.
+			dsn := env.Get("DATABASE_URL", defaultDsnAddr)
+
+			// Resolve Redis address.
+			// Used for emitting event notifications to downstream services.
+			redisAddr := env.Get("REDIS_ADDR", defaultRedisAddr)
+
+			// Initialize PostgreSQL connection.
+			// This is required for persisting incident storage.
+			db, err := postgres.Open(dsn)
+			if err != nil {
+				return fmt.Errorf("db open: %w", err)
 			}
 
-			// Resolve Redis address
-			if redisAddr == "" {
-				redisAddr = os.Getenv("REDIS_ADDR")
-				if redisAddr == "" {
-					redisAddr = defaultRedisAddr
-					logger.Info("using default redis address", "redis-addr", redisAddr)
-				}
+			// Ensure database readiness before controller startup.
+			if err := postgres.PingWithRetry(cmd.Context(), db); err != nil {
+				return fmt.Errorf("db not ready: %w", err)
 			}
 
-			// Create Redis base client
+			// Initialize incident repository layer.
+			// This is the only abstraction allowed to access the incidents table.
+			repo := incident.NewRepository(db)
+
+			// Ensure database schema exists before processing workloads.
+			if err := repo.InitSchema(cmd.Context()); err != nil {
+				return fmt.Errorf("init schema: %w", err)
+			}
+
+			// Initialize Redis client for event publishing.
 			rdb := redis.NewClient(&redis.Options{
 				Addr: redisAddr,
 			})
-			baseClient := redisstream.NewClient(rdb)
 
-			// Domain-specific stream client
-			incidentClient := redisstream.IncidentStreamClient{
-				Client: baseClient,
-			}
-
-			// Register Kubernetes API scheme
+			// Register Kubernetes API scheme for controller-runtime.
 			scheme := runtime.NewScheme()
 			utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-			// Build K8s config
+			// Create K8s controller manager.
+			// Manages reconciliation loops and lifecycle of controllers.
 			config := ctrl.GetConfigOrDie()
 
-			// Create controller manager
 			mgr, err := ctrl.NewManager(config, ctrl.Options{
 				Scheme: scheme,
 			})
@@ -95,15 +117,25 @@ func newPatrolCommand() *cobra.Command {
 				return fmt.Errorf("failed to create manager: %w", err)
 			}
 
-			// Reconciler
-			reconciler := &officer.PodReconciler{
-				Client:  mgr.GetClient(),
-				Log:     log.Log.WithName("reconciler"),
-				Archive: &incidentClient,
-				Cluster: clusterName,
+			// Create Kubernetes client for direct API calls (logs, events, etc.)
+			kubernetesClient, err := kubernetes.NewForConfig(config)
+			if err != nil {
+				return err
 			}
 
-			// Controller
+			// Initialize Pod reconciler.
+			// It detects failures and generates IncidentReports.
+			reconciler := &officer.PodReconciler{
+				Client:     mgr.GetClient(),
+				KubeClient: kubernetesClient,
+				Log:        log.Log.WithName("reconciler"),
+				Cluster:    clusterName,
+				Repo:       repo,
+				RDB:        rdb,
+			}
+
+			// Register controller with manager.
+			// Watches Pod resources and triggers reconciliation on changes.
 			if err := ctrl.NewControllerManagedBy(mgr).
 				For(&v1.Pod{}).
 				Complete(reconciler); err != nil {
@@ -112,6 +144,7 @@ func newPatrolCommand() *cobra.Command {
 
 			logger.Info("controller registered, starting manager")
 
+			// Start controller manager.
 			return mgr.Start(cmd.Context())
 		},
 	}

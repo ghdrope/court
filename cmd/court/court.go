@@ -32,17 +32,20 @@ import (
 const defaultDSN = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
 const defaultRedisAddr = "localhost:6379"
 
-// newCourtCommand starts the Court worker loop.
+// newCourtCommand starts the Court worker.
+//
+// It consumes prosecutor completion events and creates suits.
 func newCourtCommand() *cobra.Command {
 
 	var redisAddr string
 
 	cmd := &cobra.Command{
 		Use:   "court",
-		Short: "Start Court event-processing loop",
+		Short: "Start Court worker",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			ctx := cmd.Context()
+			logger := zap.L().With(zap.String("component", "court"))
 
 			// Resolve database DSN
 			dsn := os.Getenv("DATABASE_URL")
@@ -61,11 +64,11 @@ func newCourtCommand() *cobra.Command {
 			// Open database connection
 			db, err := sql.Open("pgx", dsn)
 			if err != nil {
-				return fmt.Errorf("db open: %w", err)
+				return fmt.Errorf("open database: %w", err)
 			}
 			defer func() {
 				if err := db.Close(); err != nil {
-					zap.L().Error("failed to close db", zap.Error(err))
+					logger.Error("failed to close db", zap.Error(err))
 				}
 			}()
 
@@ -75,24 +78,22 @@ func newCourtCommand() *cobra.Command {
 			}
 
 			// Create Redis client
-			rdb := redis.NewClient(&redis.Options{
-				Addr: redisAddr,
-			})
+			rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
 
-			client := redisstream.NewClient(rdb)
+			courtClient := redisstream.NewCourtStreamClient(rdb)
 
 			// Ensure consumer group exists
-			if err := client.EnsureCourtGroup(ctx); err != nil {
+			if err := courtClient.Client.EnsureGroup(ctx); err != nil {
 				return err
 			}
 
 			// Initialize prosecutor service
 			svc := court.New(db)
 
-			zap.L().Info("prosecutor worker started")
+			logger.Info("court worker started")
 
 			// Start consuming events
-			return client.ConsumeCourtLoop(ctx, svc)
+			return courtClient.ConsumeCourt(ctx, svc)
 		},
 	}
 

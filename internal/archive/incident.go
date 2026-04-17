@@ -97,7 +97,7 @@ func (a *Archive) StoreIncident(
 		r.Pod,
 		eventsJSON,
 		containerIssuesJSON,
-		r.ProsecutorCommentary,
+		r.Analysis,
 		time.Now(),
 	)
 
