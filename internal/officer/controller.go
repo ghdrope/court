@@ -21,19 +21,12 @@ import (
 
 	"github.com/ghdrope/court/internal/incident"
 	"github.com/go-logr/logr"
-	"github.com/redis/go-redis/v9"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 )
-
-// ArchiveClient defines the contract for sending IncidentReports
-// to the Archive service.
-type ArchiveClient interface {
-	Send(ctx context.Context, r *incident.IncidentReport) error
-}
 
 // PodReconciler reconciles Pod resources and produces IncidentReports
 // for workloads that match known failure conditions.
@@ -43,8 +36,7 @@ type PodReconciler struct {
 	KubeClient kubernetes.Interface
 	Log        logr.Logger
 
-	Repo *incident.Repository
-	RDB  *redis.Client
+	Service *Service
 
 	Cluster string
 }
@@ -100,28 +92,12 @@ func (r *PodReconciler) Reconcile(
 
 	logger.Info("incident detected",
 		"id", report.ID,
-		"cluster", report.Cluster,
-		"namespace", report.Namespace,
-		"pod", report.Pod,
-		"events", events,
-		"containerIssues", containerIssues,
 	)
 
-	if err := r.Repo.Insert(ctx, &report); err != nil {
-		logger.Error(err, "failed to insert incident into postgres", "id", report.ID)
+	// Delegate handling to service
+	if err := r.Service.HandleIncident(ctx, &report); err != nil {
+		logger.Error(err, "faile dto handle incident", "id", report.ID)
 		return ctrl.Result{}, err
-	}
-	logger.Info("incident stored in postgres",
-		"id", report.ID,
-	)
-
-	// Emit event
-	if err := r.RDB.Publish(ctx, "incident.created", report.ID).Err(); err != nil {
-		logger.Error(err, "failed to publish incident event", "id", report.ID)
-	} else {
-		logger.Info("incident event published",
-			"id", report.ID,
-		)
 	}
 
 	return ctrl.Result{}, nil

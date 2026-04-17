@@ -24,6 +24,7 @@ import (
 	"github.com/ghdrope/court/pkg/env"
 	"github.com/ghdrope/court/pkg/postgres"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 
 	"github.com/spf13/cobra"
 
@@ -53,35 +54,51 @@ const defaultRedisAddr = "localhost:6379"
 //   - Publishing incident events to Redis for downstream consumers
 func newOfficerCommand() *cobra.Command {
 
-	var redisAddr string
-	var clusterName string
+	var (
+		redisAddr string
+		cluster   string
+		dsn       string
+	)
 
 	cmd := &cobra.Command{
-		Use:  "patrol",
+		Use:  "officer",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 
-			logger := ctrl.Log.WithName("officer")
-			logger.Info("starting patrol controller")
+			ctrlLogger := ctrl.Log.WithName("officer")
+			ctrlLogger.Info("starting officer")
 
-			// Resolve cluster identity.
-			// Used to uniquely identify the source Kubernetes environment.
-			clusterName := env.Get("CLUSTER_NAME", defaultClusterName)
+			// Resolve config (flag > env > default)
+			clusterName := env.FirstNonEmpty(
+				cluster,
+				env.Get("CLUSTER_NAME", defaultClusterName),
+			)
 
-			// Resolve PostgreSQL connection string.
-			// Used for persisting IncidentReports.
-			dsn := env.Get("DATABASE_URL", defaultDsnAddr)
+			databaseURL := env.FirstNonEmpty(
+				dsn,
+				env.Get("DATABASE_URL", defaultDsnAddr),
+			)
 
-			// Resolve Redis address.
-			// Used for emitting event notifications to downstream services.
-			redisAddr := env.Get("REDIS_ADDR", defaultRedisAddr)
+			redisAddress := env.FirstNonEmpty(
+				redisAddr,
+				env.Get("REDIS_ADDR", defaultRedisAddr),
+			)
 
+			// Initialize structured logger (zap).
+			zapLogger := zap.L().With(zap.String("component", "officer"))
+
+			// --- Postgres ---
 			// Initialize PostgreSQL connection.
 			// This is required for persisting incident storage.
-			db, err := postgres.Open(dsn)
+			db, err := postgres.Open(databaseURL)
 			if err != nil {
 				return fmt.Errorf("db open: %w", err)
 			}
+			defer func() {
+				if err := db.Close(); err != nil {
+					zapLogger.Error("failed to close database", zap.Error(err))
+				}
+			}()
 
 			// Ensure database readiness before controller startup.
 			if err := postgres.PingWithRetry(cmd.Context(), db); err != nil {
@@ -89,7 +106,6 @@ func newOfficerCommand() *cobra.Command {
 			}
 
 			// Initialize incident repository layer.
-			// This is the only abstraction allowed to access the incidents table.
 			repo := incident.NewRepository(db)
 
 			// Ensure database schema exists before processing workloads.
@@ -97,11 +113,17 @@ func newOfficerCommand() *cobra.Command {
 				return fmt.Errorf("init schema: %w", err)
 			}
 
+			// --- Redis ---
 			// Initialize Redis client for event publishing.
 			rdb := redis.NewClient(&redis.Options{
-				Addr: redisAddr,
+				Addr: redisAddress,
 			})
 
+			// --- Service ---
+			// Initialize Officer service.
+			svc := officer.New(repo, rdb, zapLogger)
+
+			// --- Kubernetes ---
 			// Register Kubernetes API scheme for controller-runtime.
 			scheme := runtime.NewScheme()
 			utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -118,7 +140,7 @@ func newOfficerCommand() *cobra.Command {
 			}
 
 			// Create Kubernetes client for direct API calls (logs, events, etc.)
-			kubernetesClient, err := kubernetes.NewForConfig(config)
+			kubeClient, err := kubernetes.NewForConfig(config)
 			if err != nil {
 				return err
 			}
@@ -127,11 +149,10 @@ func newOfficerCommand() *cobra.Command {
 			// It detects failures and generates IncidentReports.
 			reconciler := &officer.PodReconciler{
 				Client:     mgr.GetClient(),
-				KubeClient: kubernetesClient,
+				KubeClient: kubeClient,
 				Log:        log.Log.WithName("reconciler"),
+				Service:    svc,
 				Cluster:    clusterName,
-				Repo:       repo,
-				RDB:        rdb,
 			}
 
 			// Register controller with manager.
@@ -142,7 +163,7 @@ func newOfficerCommand() *cobra.Command {
 				return fmt.Errorf("failed to create controller: %w", err)
 			}
 
-			logger.Info("controller registered, starting manager")
+			ctrlLogger.Info("controller registered, starting manager")
 
 			// Start controller manager.
 			return mgr.Start(cmd.Context())
@@ -150,7 +171,8 @@ func newOfficerCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
-	cmd.Flags().StringVar(&clusterName, "cluster", "", "Cluster name")
+	cmd.Flags().StringVar(&dsn, "database-url", "", "PostgreSQL DSN")
+	cmd.Flags().StringVar(&cluster, "cluster", "", "Cluster name")
 
 	return cmd
 }

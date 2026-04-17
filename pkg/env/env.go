@@ -27,3 +27,18 @@ func Get(key string, defaultValue string) string {
 	}
 	return value
 }
+
+// FirstNonEmpty returns the first non-empty string from the provided values.
+//
+// It is commonly used to resolve configuration with precedence, for example:
+// flag > environment variable > default value.
+//
+// If all values are empty, it returns an empty string.
+func FirstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
