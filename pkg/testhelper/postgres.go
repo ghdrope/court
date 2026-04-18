@@ -19,7 +19,23 @@ package testhelper
 import (
 	"database/sql"
 	"testing"
+
+	"github.com/DATA-DOG/go-sqlmock"
 )
+
+// NewSQLMock creates a sqlmock database for tests.
+//
+// The caller is responsible for closing the DB.
+func NewSQLMock(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
+	t.Helper()
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	return db, mock
+}
 
 // CloseDB closes the database connection.
 func CloseDB(t *testing.T, db *sql.DB) {

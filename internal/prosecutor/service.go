@@ -17,24 +17,23 @@ limitations under the License.
 package prosecutor
 
 import (
-	"context"
-	"database/sql"
-
-	"github.com/ghdrope/court/internal/archive"
+	"github.com/ghdrope/court/internal/incident"
+	"go.uber.org/zap"
 )
 
-// Service handles post-processing over items previously persisted in
-// the Archive.
+// Service handles post-processing over stored IncidentReports.
 //
-// It is responsible for enriching stored data.
+// It is responsible for orchestrating enrichment pipelines and
+// persisting analysis results into the database.
 type Service struct {
-	DB        *sql.DB
-	Publisher interface {
-		PublishStored(context.Context, archive.StoredEvent) error
-	}
+	Repo *incident.Repository
+	Log  *zap.Logger
 }
 
-// New creates a new Prosecutor service backed by the given database.
-func New(db *sql.DB) *Service {
-	return &Service{DB: db}
+// New creates a new Prosecutor service.
+func New(repo *incident.Repository, log *zap.Logger) *Service {
+	return &Service{
+		Repo: repo,
+		Log:  log,
+	}
 }

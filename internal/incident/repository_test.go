@@ -99,8 +99,6 @@ func TestInsert(t *testing.T) {
 			sqlmock.AnyArg(), // issues JSON
 			"",               // commentary
 			"",               // repo URL
-			sqlmock.AnyArg(), // created_at
-			sqlmock.AnyArg(), // updated_at
 		).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 

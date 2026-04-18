@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
@@ -18,11 +19,16 @@ type HandlerFunc func(ctx context.Context, data []byte) error
 //
 // Messages are acknowledged only after successful processing.
 //
-// This function is blocking and should typically run in a goroutine.
-// It exits when the provided context is cancelled.
+// This function is blocking and exits when the context is cancelled.
 func (c *StreamClient) Consume(ctx context.Context, handler HandlerFunc) error {
 
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		res, err := c.rdb.XReadGroup(ctx, &goredis.XReadGroupArgs{
 			Group:    c.cfg.Group,
 			Consumer: c.cfg.Consumer,
@@ -32,11 +38,10 @@ func (c *StreamClient) Consume(ctx context.Context, handler HandlerFunc) error {
 		}).Result()
 
 		if err != nil {
-			if ctx.Err() != nil {
-				return nil
+			if errors.Is(err, context.Canceled) {
+				return err
 			}
 
-			// Small backoff to avoid tight retry loops
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
@@ -53,7 +58,9 @@ func (c *StreamClient) Consume(ctx context.Context, handler HandlerFunc) error {
 					continue
 				}
 
-				_ = c.rdb.XAck(ctx, c.cfg.Stream, c.cfg.Group, msg.ID).Err()
+				if err := c.rdb.XAck(ctx, c.cfg.Stream, c.cfg.Group, msg.ID).Err(); err != nil {
+					continue
+				}
 			}
 		}
 	}

@@ -1,11 +1,27 @@
+/*
+Copyright 2026 Pedro Cozinheiro.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package incident
 
 import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"time"
 )
 
 // Repository handles persistence of IncidentReports.
@@ -19,6 +35,9 @@ type Repository struct {
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{DB: db}
 }
+
+// ErrNotFound is returned when an incident does not exist.
+var ErrNotFound = errors.New("incident not found")
 
 // InitSchema ensures the required database schema exists.
 func (r *Repository) InitSchema(ctx context.Context) error {
@@ -39,6 +58,9 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	);
+
+	CREATE INDEX IF NOT EXISTS idx_incidents_namespace_pod
+	ON incidents (namespace, pod);
 	`
 
 	_, err := r.DB.ExecContext(ctx, query)
@@ -48,6 +70,7 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 // Insert creates a new incident record in the database.
 //
 // This is called by the Officer when a new incident is detected.
+// It is idempotent at the database level.
 func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
 	if inc == nil {
 		return fmt.Errorf("incident is nil")
@@ -63,24 +86,36 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
 		return err
 	}
 
-	query := `
-	INSERT INTO incidents (
-		id,
-		cluster,
-		namespace,
-		pod,
-		events,
-		container_issues,
-		commentary,
-		related_repo_url,
-		created_at,
-		updated_at
-	)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-	ON CONFLICT (id) DO NOTHING
-	`
+	commentary := ""
+	repoURL := ""
 
-	now := time.Now()
+	if inc.Analysis != nil {
+		commentary = inc.Analysis.Commentary
+		repoURL = inc.Analysis.RelatedRepoURL
+	}
+
+	query := `
+INSERT INTO incidents (
+	id,
+	cluster,
+	namespace,
+	pod,
+	events,
+	container_issues,
+	commentary,
+	related_repo_url
+)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+ON CONFLICT (id) DO UPDATE SET
+	cluster = EXCLUDED.cluster,
+	namespace = EXCLUDED.namespace,
+	pod = EXCLUDED.pod,
+	events = EXCLUDED.events,
+	container_issues = EXCLUDED.container_issues,
+	commentary = EXCLUDED.commentary,
+	related_repo_url = EXCLUDED.related_repo_url,
+	updated_at = NOW()
+`
 
 	_, err = r.DB.ExecContext(
 		ctx,
@@ -91,10 +126,8 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
 		inc.Pod,
 		eventsJSON,
 		issuesJSON,
-		"",
-		"",
-		now,
-		now,
+		commentary,
+		repoURL,
 	)
 
 	if err != nil {
@@ -102,6 +135,69 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
 	}
 
 	return nil
+}
+
+// GetByID retrieves a full IncidentReport by its ID.
+//
+// It reconstructs JSON fields (events and container issues)
+// into the domain model.
+func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, error) {
+	query := `
+	SELECT 
+		id,
+		cluster,
+		namespace,
+		pod,
+		events,
+		container_issues,
+		commentary,
+		related_repo_url
+	FROM incidents
+	WHERE id = $1
+	`
+
+	var (
+		inc        IncidentReport
+		eventsJSON []byte
+		issuesJSON []byte
+		commentary string
+		repoURL    string
+	)
+
+	err := r.DB.QueryRowContext(ctx, query, id).
+		Scan(
+			&inc.ID,
+			&inc.Cluster,
+			&inc.Namespace,
+			&inc.Pod,
+			&eventsJSON,
+			&issuesJSON,
+			&commentary,
+			&repoURL,
+		)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("%w: %s", ErrNotFound, id)
+		}
+		return nil, fmt.Errorf("query incident: %w", err)
+	}
+
+	if err := json.Unmarshal(eventsJSON, &inc.Events); err != nil {
+		return nil, fmt.Errorf("unmarshal events: %w", err)
+	}
+
+	if err := json.Unmarshal(issuesJSON, &inc.ContainerIssues); err != nil {
+		return nil, fmt.Errorf("unmarshal container issues: %w", err)
+	}
+
+	if commentary != "" || repoURL != "" {
+		inc.Analysis = &ProsecutorAnalysis{
+			Commentary:     commentary,
+			RelatedRepoURL: repoURL,
+		}
+	}
+	return &inc, nil
 }
 
 // UpdateAnalysis updates the Prosecutor-generated analysis.
