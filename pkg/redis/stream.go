@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -22,22 +21,6 @@ func NewStreamClient(rdb *goredis.Client, cfg Config) *StreamClient {
 		rdb: rdb,
 		cfg: cfg,
 	}
-}
-
-// Publish sends a payload into the configured Redis Stream.
-// The payload is serialized as JSON and stored under the "payload" field.
-func (c *StreamClient) Publish(ctx context.Context, payload any) error {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal payload: %w", err)
-	}
-
-	return c.rdb.XAdd(ctx, &goredis.XAddArgs{
-		Stream: c.cfg.Stream,
-		Values: map[string]any{
-			"payload": string(data),
-		},
-	}).Err()
 }
 
 // EnsureGroup creates the consumer group if it does not exist.
