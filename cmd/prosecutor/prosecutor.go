@@ -17,91 +17,111 @@ limitations under the License.
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 
-	"github.com/ghdrope/court/internal/archive"
+	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/prosecutor"
 	redisstream "github.com/ghdrope/court/internal/transport/redis"
-	"github.com/redis/go-redis/v9"
+	"github.com/ghdrope/court/pkg/env"
+	"github.com/ghdrope/court/pkg/postgres"
+	redispkg "github.com/ghdrope/court/pkg/redis"
+	goredis "github.com/redis/go-redis/v9"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-const defaultDSN = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
-const defaultRedisAddr = "localhost:6379"
+const (
+	defaultDSN       = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
+	defaultRedisAddr = "localhost:6379"
+)
 
-// newProsecutorCommand starts the Prosecutor worker.
+// newProsecutorCommand initializes the Prosecutor worker process.
 //
-// It consumes stored events and enriches them before forwarding
-// to the Court service.
+// The Prosecutor is responsible for:
+//   - Consuming "incident.created" events from Redis Streams
+//   - Loading full IncidentReports from PostgreSQL
+//   - Performing post-processing analysis
+//   - Persisting analysis results back into the archive
+//   - Publishing downstream events for further processing
 func newProsecutorCommand() *cobra.Command {
 
-	var redisAddr string
+	var (
+		redisAddr string
+		dsn       string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "prosecutor",
 		Short: "Start Prosecutor worker",
-		Long:  "Prosecutor consumes stored events and enriches Court handled data.",
+		Long:  "Prosecutor consumes incident events and enriches them with analysis before persistence.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			ctx := cmd.Context()
 			logger := zap.L().With(zap.String("component", "prosecutor"))
 
-			// Resolve database DSN
-			dsn := os.Getenv("DATABASE_URL")
-			if dsn == "" {
-				dsn = defaultDSN
-			}
+			// Resolve configuration (flag > env > default)
+			databaseURL := env.FirstNonEmpty(
+				dsn,
+				env.Get("DATABASE_URL", defaultDSN),
+			)
 
-			// Resolve Redis address
-			if redisAddr == "" {
-				redisAddr = os.Getenv("REDIS_ADDR")
-				if redisAddr == "" {
-					redisAddr = defaultRedisAddr
-				}
-			}
+			redisAddress := env.FirstNonEmpty(
+				redisAddr,
+				env.Get("REDIS_ADDR", defaultRedisAddr),
+			)
 
-			// Open database connection
-			db, err := sql.Open("pgx", dsn)
+			// --- PostgreSQL ---
+			// Initialize PostgreSQL connection.
+			// This is required for persisting incident storage.
+			db, err := postgres.Open(databaseURL)
 			if err != nil {
 				return fmt.Errorf("db open: %w", err)
 			}
 			defer func() {
 				if err := db.Close(); err != nil {
-					logger.Error("failed to close db", zap.Error(err))
+					logger.Error("failed to close database", zap.Error(err))
 				}
 			}()
 
-			// Ensure DB is reachable
-			if err := archive.WaitForDB(ctx, db); err != nil {
-				return err
+			// Ensure DB is ready before processing events
+			if err := postgres.PingWithRetry(cmd.Context(), db); err != nil {
+				return fmt.Errorf("db not ready: %w", err)
 			}
 
-			// Create Redis client
-			rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+			// Repository layer.
+			repo := incident.NewRepository(db)
 
-			client := redisstream.NewProsecutorStreamClient(rdb)
-			courtClient := redisstream.NewCourtStreamClient(rdb)
+			// --- Redis ---
+			rdb := goredis.NewClient(&goredis.Options{
+				Addr: redisAddress,
+			})
 
-			// Ensure consumer group exists
-			if err := client.Client.EnsureGroup(ctx); err != nil {
-				return err
-			}
+			hostname, _ := os.Hostname()
+			consumerName := fmt.Sprintf("prosecutor-%s", hostname)
 
-			// Initialize prosecutor service
-			svc := prosecutor.New(db)
-			svc.Publisher = courtClient
+			streamClient := redispkg.NewStreamClient(rdb, redispkg.Config{
+				Stream:   "incident.created",
+				Group:    "prosecutor-group",
+				Consumer: consumerName,
+			})
 
-			logger.Info("prosecutor worker started")
+			svc := prosecutor.New(repo, logger)
 
-			// Start consuming events
-			return client.ConsumeProsecutor(ctx, svc)
+			consumer := redisstream.NewIncidentCreatedConsumer(streamClient, logger)
+
+			logger.Info("prosecutor started",
+				zap.String("consumer", consumerName),
+			)
+
+			return consumer.Start(ctx, svc)
 		},
 	}
 
 	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
+	cmd.Flags().StringVar(&dsn, "database-url", "", "PostgreSQL DSN")
 
 	return cmd
 }

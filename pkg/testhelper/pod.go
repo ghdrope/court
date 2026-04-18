@@ -31,12 +31,3 @@ func NewTestPod(namespace, name string) *v1.Pod {
 		},
 	}
 }
-
-// NewPodWithStatuses creates a pod with given container statuses.
-func NewPodWithStatuses(statuses []v1.ContainerStatus) *v1.Pod {
-	return &v1.Pod{
-		Status: v1.PodStatus{
-			ContainerStatuses: statuses,
-		},
-	}
-}

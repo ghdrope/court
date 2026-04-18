@@ -39,5 +39,5 @@ func Execute(ctx context.Context) error {
 }
 
 func init() {
-	rootCmd.AddCommand(newCourtCommand())
+	//rootCmd.AddCommand(newCourtCommand())
 }

@@ -16,13 +16,6 @@ limitations under the License.
 
 package redis
 
-import goredis "github.com/redis/go-redis/v9"
-
-// New Client creates and returns a new Redis client.
-func NewClient(opts *goredis.Options) *goredis.Client {
-	return goredis.NewClient(opts)
-}
-
 // Config defines the configuration for a Redis Stream consumer group.
 type Config struct {
 	Stream   string // Stream name

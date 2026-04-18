@@ -14,22 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package suit
+package prosecutor
 
-import "time"
+import (
+	"github.com/ghdrope/court/internal/incident"
+	"go.uber.org/zap"
+)
 
-// CourtSuit represents a suit created from a processed incident.
+// Service handles post-processing over stored IncidentReports.
 //
-// It does not duplicate the IncidentReport.
-type CourtSuit struct {
-	ID string
+// It is responsible for orchestrating enrichment pipelines and
+// persisting analysis results into the database.
+type Service struct {
+	Repo *incident.Repository
+	Log  *zap.Logger
+}
 
-	// Reference to the original incident report
-	IncidentID string
-
-	Cluster   string
-	Namespace string
-	Pod       string
-
-	CreatedAt time.Time
+// New creates a new Prosecutor service.
+func New(repo *incident.Repository, log *zap.Logger) *Service {
+	return &Service{
+		Repo: repo,
+		Log:  log,
+	}
 }

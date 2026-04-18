@@ -86,3 +86,53 @@ func TestGet_IsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+// TestFirstNonEmpty_ReturnsFirstValue verifies that FirstNonEmpty returns
+// the first value when all inputs are non-empty.
+func TestFirstNonEmpty_ReturnsFirstValue(t *testing.T) {
+	got := FirstNonEmpty("a", "b", "c")
+
+	if got != "a" {
+		t.Fatalf("expected a, got %s", got)
+	}
+}
+
+// TestFirstNonEmpty_SkipsEmptyValues verifies that FirstNonEmpty skips
+// empty strings and returns the first non-empty value.
+func TestFirstNonEmpty_SkipsEmptyValues(t *testing.T) {
+	got := FirstNonEmpty("", "", "c", "d")
+
+	if got != "c" {
+		t.Fatalf("expected c, got %s", got)
+	}
+}
+
+// TestFirstNonEmpty_AllEmpty verifies that FirstNonEmpty returns an empty
+// string when all provided values are empty.
+func TestFirstNonEmpty_AllEmpty(t *testing.T) {
+	got := FirstNonEmpty("", "", "")
+
+	if got != "" {
+		t.Fatalf("expected empty string, got %s", got)
+	}
+}
+
+// TestFirstNonEmpty_SingleValue verifies that FirstNonEmpty returns the
+// value when a single non-empty argument is provided.
+func TestFirstNonEmpty_SingleValue(t *testing.T) {
+	got := FirstNonEmpty("only")
+
+	if got != "only" {
+		t.Fatalf("expected only, got %s", got)
+	}
+}
+
+// TestFirstNonEmpty_EmptyInput verifies that FirstNonEmpty returns an
+// empty string when no arguments are provided.
+func TestFirstNonEmpty_EmptyInput(t *testing.T) {
+	got := FirstNonEmpty()
+
+	if got != "" {
+		t.Fatalf("expected empty string, got %s", got)
+	}
+}
