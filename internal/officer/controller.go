@@ -28,6 +28,16 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// IncidentService defines the contract required by the PodReconciler
+// to persist and process incident reports.
+//
+// Implementations of this interface are responsible for handling
+// the full lifecycle of an IncidentReport, including persistence,
+// event emission, and downstream processing.
+type IncidentService interface {
+	HandleIncident(ctx context.Context, r *incident.IncidentReport) error
+}
+
 // PodReconciler reconciles Pod resources and produces IncidentReports
 // for workloads that match known failure conditions.
 type PodReconciler struct {
@@ -36,7 +46,7 @@ type PodReconciler struct {
 	KubeClient kubernetes.Interface
 	Log        logr.Logger
 
-	Service *Service
+	Service IncidentService
 
 	Cluster string
 }
