@@ -14,30 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package suit
 
-import (
-	"context"
+import "time"
 
-	"github.com/spf13/cobra"
+// Status represents the lifecycle state of a Suit.
+type Status string
+
+const (
+	StatusOpen   Status = "open"
+	StatusClosed Status = "closed"
 )
 
-// rootCmd is the base CLI command for the Court.
-var rootCmd = &cobra.Command{
-	Use:   "court",
-	Short: "Court service for formal case creation",
-	Long:  "Court consumes prosecutor events and creates suits",
-	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.HelpFunc()(cmd, args)
-	},
-}
-
-// Execute runs the CLI with context propagation.
-func Execute(ctx context.Context) error {
-	return rootCmd.ExecuteContext(ctx)
-}
-
-func init() {
-	rootCmd.AddCommand(newCourtCommand())
+// Suit represents a wrapper around an Incident.
+//
+// It does NOT dulicate the IncidentReport. It only references it.
+type Suit struct {
+	ID         string
+	IncidentID string
+	Status     Status
+	CreatedAt  time.Time
+	ClosedAt   *time.Time
 }

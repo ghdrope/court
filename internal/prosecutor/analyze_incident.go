@@ -18,9 +18,11 @@ package prosecutor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/ghdrope/court/internal/incident"
+	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -64,9 +66,30 @@ func (s *Service) ProcessIncident(ctx context.Context, r *incident.IncidentRepor
 		return err
 	}
 
-	logger.Info("analysis persisted to archive",
-		zap.String("incident_id", r.ID),
-	)
+	logger.Info("analysis persisted")
+
+	// Emit event after persistence
+	payload := map[string]any{
+		"incident_id": r.ID,
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		logger.Error("failed to marshal event", zap.Error(err))
+		return err
+	}
+
+	if err := s.RDB.XAdd(ctx, &goredis.XAddArgs{
+		Stream: AnalyzedStream,
+		Values: map[string]any{
+			"payload": string(data),
+		},
+	}).Err(); err != nil {
+		logger.Error("failed to publish incident.analyzed event", zap.Error(err))
+		return err
+	}
+
+	logger.Info("incident.analyzed event published")
 
 	return nil
 }

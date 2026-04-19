@@ -17,9 +17,22 @@ limitations under the License.
 package prosecutor
 
 import (
+	"context"
+
 	"github.com/ghdrope/court/internal/incident"
+	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
+
+// Stream configuration for analyzed incidents.
+const (
+	AnalyzedStream = "incident.analyzed"
+)
+
+// IncidentRepository defines persistence contract.
+type IncidentRepository interface {
+	UpdateAnalysis(ctx context.Context, r *incident.IncidentReport) error
+}
 
 // Service handles post-processing over stored IncidentReports.
 //
@@ -27,13 +40,15 @@ import (
 // persisting analysis results into the database.
 type Service struct {
 	Repo *incident.Repository
+	RDB  *goredis.Client
 	Log  *zap.Logger
 }
 
 // New creates a new Prosecutor service.
-func New(repo *incident.Repository, log *zap.Logger) *Service {
+func New(repo *incident.Repository, rdb *goredis.Client, log *zap.Logger) *Service {
 	return &Service{
 		Repo: repo,
+		RDB:  rdb,
 		Log:  log,
 	}
 }

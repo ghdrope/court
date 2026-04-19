@@ -37,6 +37,18 @@ func NewSQLMock(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 	return db, mock
 }
 
+// NewTestDB creates a mock database and sqlmock instance.
+func NewTestDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
+	t.Helper()
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+
+	return db, mock
+}
+
 // CloseDB closes the database connection.
 func CloseDB(t *testing.T, db *sql.DB) {
 	t.Helper()
