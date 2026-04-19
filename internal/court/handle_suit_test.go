@@ -21,19 +21,19 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/suit"
+	"github.com/ghdrope/court/pkg/testhelper"
 	"go.uber.org/zap"
 )
 
-// fakeSuitRepo is a minimal in-memory implementation of the suit repository.
-//
-// It is used to validate the behavior of CreateSuit without requiring a real database.
+// fakeSuitRepo is an in-memory implementation of SuitRepository.
+// It is used to validate service behavior without requiring a real database.
 type fakeSuitRepo struct {
 	store     map[string]*suit.Suit
 	insertErr error
 }
 
-// newFakeSuitRepo initializes an empty in-memory repository.
 func newFakeSuitRepo() *fakeSuitRepo {
 	return &fakeSuitRepo{
 		store: make(map[string]*suit.Suit),
@@ -45,7 +45,6 @@ func (f *fakeSuitRepo) Insert(ctx context.Context, s *suit.Suit) error {
 	if f.insertErr != nil {
 		return f.insertErr
 	}
-
 	f.store[s.IncidentID] = s
 	return nil
 }
@@ -72,11 +71,16 @@ func (f *fakeSuitRepo) Close(ctx context.Context, id string) error {
 func TestCreateSuit_Success(t *testing.T) {
 
 	repo := newFakeSuitRepo()
+	gh := &testhelper.GitHubMock{}
 	logger := zap.NewNop()
 
-	svc := New(repo, logger)
+	svc := New(repo, gh, logger)
 
-	err := svc.CreateSuit(context.Background(), "incident-123")
+	inc := &incident.IncidentReport{
+		ID: "incident-123",
+	}
+
+	err := svc.CreateSuit(context.Background(), inc)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,6 +93,10 @@ func TestCreateSuit_Success(t *testing.T) {
 	if s.IncidentID != "incident-123" {
 		t.Fatalf("expected incident_id incident-123, got %s", s.IncidentID)
 	}
+
+	if !gh.Called {
+		t.Fatal("expected github issue to be created")
+	}
 }
 
 // TestCreateSuit_EmptyIncidentID verifies input validation.
@@ -97,11 +105,12 @@ func TestCreateSuit_Success(t *testing.T) {
 func TestCreateSuit_EmptyIncidentID(t *testing.T) {
 
 	repo := newFakeSuitRepo()
+	gh := &testhelper.GitHubMock{}
 	logger := zap.NewNop()
 
-	svc := New(repo, logger)
+	svc := New(repo, gh, logger)
 
-	err := svc.CreateSuit(context.Background(), "")
+	err := svc.CreateSuit(context.Background(), nil)
 	if err == nil {
 		t.Fatal("expected error for empty incidentID")
 	}
@@ -115,24 +124,23 @@ func TestCreateSuit_EmptyIncidentID(t *testing.T) {
 func TestCreateSuit_Idempotency(t *testing.T) {
 
 	repo := newFakeSuitRepo()
+	gh := &testhelper.GitHubMock{}
 	logger := zap.NewNop()
 
-	svc := New(repo, logger)
+	svc := New(repo, gh, logger)
 
-	incidentID := "incident-456"
-
-	_ = svc.CreateSuit(context.Background(), incidentID)
-	firstCount := len(repo.store)
-
-	_ = svc.CreateSuit(context.Background(), incidentID)
-	secondCount := len(repo.store)
-
-	if firstCount != 1 {
-		t.Fatalf("expected 1 suit after first call, got %d", firstCount)
+	inc := &incident.IncidentReport{
+		ID: "incident-456",
 	}
 
-	if secondCount != 1 {
-		t.Fatalf("expected idempotent behavior, got %d suits", secondCount)
+	_ = svc.CreateSuit(context.Background(), inc)
+	first := len(repo.store)
+
+	_ = svc.CreateSuit(context.Background(), inc)
+	second := len(repo.store)
+
+	if second != first {
+		t.Fatalf("expected idempotent behavior, got %d vs %d", second, first)
 	}
 }
 
@@ -150,11 +158,16 @@ func TestCreateSuit_InsertError(t *testing.T) {
 		insertErr: expectedErr,
 	}
 
+	gh := &testhelper.GitHubMock{}
 	logger := zap.NewNop()
 
-	svc := New(repo, logger)
+	svc := New(repo, gh, logger)
 
-	err := svc.CreateSuit(context.Background(), "incident-123")
+	inc := &incident.IncidentReport{
+		ID: "incident-123",
+	}
+
+	err := svc.CreateSuit(context.Background(), inc)
 
 	if err == nil {
 		t.Fatal("expected error from repository")
