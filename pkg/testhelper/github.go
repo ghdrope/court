@@ -27,14 +27,22 @@ type GitHubMock struct {
 	Title string
 	Body  string
 
+	URL string
 	Err error
 }
 
 // CreateIssue records the call and returns a predefined error if set.
-func (m *GitHubMock) CreateIssue(ctx context.Context, title, body string) error {
+func (m *GitHubMock) CreateIssue(ctx context.Context, title, body string) (string, error) {
 	m.Called = true
 	m.Title = title
 	m.Body = body
 
-	return m.Err
+	if m.Err != nil {
+		return "", m.Err
+	}
+
+	// deterministic fake URL for tests
+	m.URL = "https://github.com/test/repo/issues/1"
+
+	return m.URL, nil
 }

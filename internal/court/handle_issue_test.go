@@ -63,10 +63,14 @@ func TestCreateGitHubIssue(t *testing.T) {
 		},
 	}
 
-	err := svc.createGitHubIssue(context.Background(), inc)
+	url, err := svc.createGitHubIssue(context.Background(), inc)
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if url == "" {
+		t.Fatal("exected issue URL, got empty string")
 	}
 
 	if !gh.Called {

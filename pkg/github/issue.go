@@ -30,8 +30,13 @@ type CreateIssueRequest struct {
 	Body  string `json:"body"`
 }
 
+// GitHubIssueResponse represents the minimal fields needed from GitHub.
+type GitHubIssueResponse struct {
+	HTMLURL string `json:"html_url"`
+}
+
 // CreateIssue creates a new GitHub issue.
-func (c *Client) CreateIssue(ctx context.Context, title, body string) error {
+func (c *Client) CreateIssue(ctx context.Context, title, body string) (string, error) {
 	url := fmt.Sprintf("%s/repos/%s/issues", c.baseURL, c.repo)
 
 	payload := CreateIssueRequest{
@@ -41,12 +46,12 @@ func (c *Client) CreateIssue(ctx context.Context, title, body string) error {
 
 	b, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshal issue: %w", err)
+		return "", fmt.Errorf("marshal issue: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return "", fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
@@ -55,15 +60,24 @@ func (c *Client) CreateIssue(ctx context.Context, title, body string) error {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("github request: %w", err)
+		return "", fmt.Errorf("github request: %w", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("github API returned status %d", resp.StatusCode)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("github API returned status %d", resp.StatusCode)
 	}
 
-	return nil
+	// Decode response to extract issue URL
+	var result struct {
+		HTMLURL string `json:"html_url"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+
+	return result.HTMLURL, nil
 }

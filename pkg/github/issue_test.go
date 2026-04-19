@@ -51,7 +51,12 @@ func TestCreateIssue_Success(t *testing.T) {
 			t.Fatalf("failed to decode request body: %v", err)
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
+
+		_, _ = w.Write([]byte(`{
+			"html_url": "https://github.com/owner/repo/issues/1"
+		}`))
 	}))
 	defer server.Close()
 
@@ -59,10 +64,14 @@ func TestCreateIssue_Success(t *testing.T) {
 	client.httpClient = server.Client()
 	client.baseURL = server.URL
 
-	err := client.CreateIssue(context.Background(), "test-title", "test-body")
+	url, err := client.CreateIssue(context.Background(), "test-title", "test-body")
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if url == "" {
+		t.Fatal("expected issue URL, got empty string")
 	}
 
 	if receivedRequest.Title != "test-title" {
@@ -86,10 +95,14 @@ func TestCreateIssue_HTTPError(t *testing.T) {
 	client.httpClient = server.Client()
 	client.baseURL = server.URL
 
-	err := client.CreateIssue(context.Background(), "title", "body")
+	url, err := client.CreateIssue(context.Background(), "title", "body")
 
 	if err == nil {
 		t.Fatal("expected error for non-2xx response")
+	}
+
+	if url != "" {
+		t.Fatal("expected empty URL on error")
 	}
 }
 
@@ -100,9 +113,13 @@ func TestCreateIssue_RequestError(t *testing.T) {
 
 	client.baseURL = "://invalid-url"
 
-	err := client.CreateIssue(context.Background(), "title", "body")
+	url, err := client.CreateIssue(context.Background(), "title", "body")
 
 	if err == nil {
 		t.Fatal("expected error for invalid request")
+	}
+
+	if url != "" {
+		t.Fatal("expected empty URL on error")
 	}
 }

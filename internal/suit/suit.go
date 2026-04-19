@@ -30,9 +30,10 @@ const (
 //
 // It does NOT dulicate the IncidentReport. It only references it.
 type Suit struct {
-	ID         string
-	IncidentID string
-	Status     Status
-	CreatedAt  time.Time
-	ClosedAt   *time.Time
+	ID             string
+	IncidentID     string
+	Status         Status
+	CreatedAt      time.Time
+	ClosedAt       *time.Time
+	GitHubIssueURL string
 }

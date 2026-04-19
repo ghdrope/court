@@ -72,11 +72,12 @@ func TestInsert(t *testing.T) {
 	now := time.Now()
 
 	s := &Suit{
-		ID:         "suit-1",
-		IncidentID: "incident-1",
-		Status:     StatusOpen,
-		CreatedAt:  now,
-		ClosedAt:   nil,
+		ID:             "suit-1",
+		IncidentID:     "incident-1",
+		Status:         StatusOpen,
+		CreatedAt:      now,
+		ClosedAt:       nil,
+		GitHubIssueURL: "https://github.com/test/issue/1",
 	}
 
 	mock.ExpectExec("INSERT INTO suits").
@@ -86,6 +87,7 @@ func TestInsert(t *testing.T) {
 			s.Status,
 			s.CreatedAt,
 			s.ClosedAt,
+			s.GitHubIssueURL,
 		).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -127,12 +129,14 @@ func TestGetByIncidentID(t *testing.T) {
 		"status",
 		"created_at",
 		"closed_at",
+		"github_issue_url",
 	}).AddRow(
 		"suit-1",
 		"incident-1",
 		StatusOpen,
 		now,
 		nil,
+		"https://github.com/test/issue/1",
 	)
 
 	mock.ExpectQuery("SELECT id, incident_id, status, created_at, closed_at").

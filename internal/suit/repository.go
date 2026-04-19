@@ -41,7 +41,8 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 		incident_id TEXT NOT NULL,
 		status TEXT NOT NULL,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-		closed_at TIMESTAMPTZ
+		closed_at TIMESTAMPTZ,
+		github_issue_url TEXT
 	);
 
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_suits_incident_id_unique
@@ -68,9 +69,10 @@ func (r *Repository) Insert(ctx context.Context, s *Suit) error {
 		incident_id,
 		status,
 		created_at,
-		closed_at
+		closed_at,
+		github_issue_url
 	)
-	VALUES ($1,$2,$3,$4,$5)
+	VALUES ($1,$2,$3,$4,$5,$6)
 	ON CONFLICT (incident_id) DO NOTHING
 	`
 
@@ -82,6 +84,7 @@ func (r *Repository) Insert(ctx context.Context, s *Suit) error {
 		s.Status,
 		s.CreatedAt,
 		s.ClosedAt,
+		s.GitHubIssueURL,
 	)
 
 	if err != nil {
@@ -94,7 +97,7 @@ func (r *Repository) Insert(ctx context.Context, s *Suit) error {
 // GetByIncidentID retrieves a Suit by its incident reference.
 func (r *Repository) GetByIncidentID(ctx context.Context, incidentID string) (*Suit, error) {
 	query := `
-	SELECT id, incident_id, status, created_at, closed_at
+	SELECT id, incident_id, status, created_at, closed_at, github_issue_url
 	FROM suits
 	WHERE incident_id = $1
 	`
@@ -107,6 +110,7 @@ func (r *Repository) GetByIncidentID(ctx context.Context, incidentID string) (*S
 		&s.Status,
 		&s.CreatedAt,
 		&s.ClosedAt,
+		&s.GitHubIssueURL,
 	)
 
 	if err != nil {
