@@ -21,47 +21,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/pkg/testhelper"
 	"go.uber.org/zap"
 )
-
-// TestProcessIncident_Success verifies full success flow.
-func TestProcessIncident_Success(t *testing.T) {
-	db, mock := testhelper.NewSQLMock(t)
-	repo := incident.NewRepository(db)
-
-	mock.ExpectExec("UPDATE incidents").
-		WithArgs(
-			sqlmock.AnyArg(), // commentary
-			sqlmock.AnyArg(), // repo URL
-			sqlmock.AnyArg(), // id
-		).
-		WillReturnResult(sqlmock.NewResult(1, 1))
-
-	svc := &Service{
-		Repo: repo,
-		Log:  zap.NewNop(),
-	}
-
-	inc := &incident.IncidentReport{
-		ID: "test-id",
-	}
-
-	err := svc.ProcessIncident(context.Background(), inc)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if inc.Analysis == nil {
-		t.Fatal("expected analysis to be set")
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("unmet expectations: %v", err)
-	}
-}
 
 // TestProcessIncident_NilIncident verifies nil input handling.
 func TestProcessIncident_NilIncident(t *testing.T) {

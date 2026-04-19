@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,15 +13,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
 package main
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/ghdrope/court/internal/incident"
-	"github.com/ghdrope/court/internal/prosecutor"
+	"github.com/ghdrope/court/internal/court"
+	"github.com/ghdrope/court/internal/suit"
 	redisstream "github.com/ghdrope/court/internal/transport/redis"
 	"github.com/ghdrope/court/pkg/env"
 	"github.com/ghdrope/court/pkg/postgres"
@@ -34,19 +33,18 @@ import (
 )
 
 const (
-	defaultDSN       = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
 	defaultRedisAddr = "localhost:6379"
+	defaultDSN       = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
 )
 
-// newProsecutorCommand initializes the Prosecutor worker process.
+// newCourtCommand initializes the Court worker process.
 //
-// The Prosecutor is responsible for:
-//   - Consuming "incident.created" events from Redis Streams
-//   - Loading full IncidentReports from PostgreSQL
-//   - Performing post-processing analysis
-//   - Persisting analysis results back into the archive
-//   - Publishing downstream events for further processing
-func newProsecutorCommand() *cobra.Command {
+// The Court service is responsible for:
+//   - Consuming "incident.analyzed" events from Redis Streams
+//   - Creating Suit records based on analyzed incidents
+//   - Ensuring idempotent creation of suits per incident
+//   - Persisting legal case state into PostgreSQL
+func newCourtCommand() *cobra.Command {
 
 	var (
 		redisAddr string
@@ -54,13 +52,13 @@ func newProsecutorCommand() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "prosecutor",
-		Short: "Start Prosecutor worker",
-		Long:  "Prosecutor consumes incident events and enriches them with analysis before persistence.",
+		Use:   "court",
+		Short: "Start Court worker",
+		Long:  "Court consumes analyzed incidents and creates suits in the archive system.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			ctx := cmd.Context()
-			logger := zap.L().With(zap.String("component", "prosecutor"))
+			logger := zap.L().With(zap.String("component", "court"))
 
 			// Resolve configuration (flag > env > default)
 			databaseURL := env.FirstNonEmpty(
@@ -75,7 +73,7 @@ func newProsecutorCommand() *cobra.Command {
 
 			// --- PostgreSQL ---
 			// Initialize PostgreSQL connection.
-			// This is required for persisting incident storage.
+			// This is required for persisting suit storage.
 			db, err := postgres.Open(databaseURL)
 			if err != nil {
 				return fmt.Errorf("db open: %w", err)
@@ -92,27 +90,35 @@ func newProsecutorCommand() *cobra.Command {
 			}
 
 			// Repository layer.
-			repo := incident.NewRepository(db)
+			repo := suit.NewRepository(db)
+
+			// Ensure schema is up to date
+			if err := repo.InitSchema(cmd.Context()); err != nil {
+				return err
+			}
 
 			// --- Redis ---
+			// Initialize Redis client used for consuming incident.analyzed stream
 			rdb := goredis.NewClient(&goredis.Options{
 				Addr: redisAddress,
 			})
 
 			hostname, _ := os.Hostname()
-			consumerName := fmt.Sprintf("prosecutor-%s", hostname)
+			consumerName := fmt.Sprintf("court-%s", hostname)
 
 			streamClient := redispkg.NewStreamClient(rdb, redispkg.Config{
-				Stream:   "incident.created",
-				Group:    "prosecutor-group",
+				Stream:   "incident.analyzed",
+				Group:    "court-group",
 				Consumer: consumerName,
 			})
 
-			svc := prosecutor.New(repo, rdb, logger)
+			// Court service handles Suit lifecycle creation
+			svc := court.New(repo, logger)
 
-			consumer := redisstream.NewIncidentCreatedConsumer(streamClient, logger)
+			// Redis Stream consumer for analyzed incidents
+			consumer := redisstream.NewIncidentAnalyzedConsumer(streamClient, logger)
 
-			logger.Info("prosecutor started",
+			logger.Info("court started",
 				zap.String("consumer", consumerName),
 			)
 

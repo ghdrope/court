@@ -52,7 +52,7 @@ func (o *Service) HandleIncident(
 	}
 
 	if err := o.RDB.XAdd(ctx, &goredis.XAddArgs{
-		Stream: "incident.created",
+		Stream: AnalyzedStream,
 		Values: map[string]any{
 			"payload": string(data),
 		},

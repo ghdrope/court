@@ -8,6 +8,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// Stream configuration for created incidents.
+const (
+	AnalyzedStream = "incident.created"
+)
+
 // IncidentRepository defines the minimal contract required by the service.
 type IncidentRepository interface {
 	Insert(ctx context.Context, r *incident.IncidentReport) error

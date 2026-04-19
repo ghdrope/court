@@ -18,28 +18,15 @@ package incident
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/ghdrope/court/pkg/testhelper"
 )
 
-// newTestDB creates a mock database and sqlmock instance.
-func newTestDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
-	t.Helper()
-
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to create sqlmock: %v", err)
-	}
-
-	return db, mock
-}
-
 // TestNewRepository verifies that a Repository is properly constructed.
 func TestNewRepository(t *testing.T) {
-	db, _ := newTestDB(t)
+	db, _ := testhelper.NewTestDB(t)
 	defer testhelper.CloseDB(t, db)
 
 	repo := NewRepository(db)
@@ -55,7 +42,7 @@ func TestNewRepository(t *testing.T) {
 
 // TestInitSchema verifies that the schema creation query is executed.
 func TestInitSchema(t *testing.T) {
-	db, mock := newTestDB(t)
+	db, mock := testhelper.NewTestDB(t)
 	defer testhelper.CloseDB(t, db)
 
 	repo := NewRepository(db)
@@ -75,7 +62,7 @@ func TestInitSchema(t *testing.T) {
 
 // TestInsert verifies that a valid incident is inserted into the database.
 func TestInsert(t *testing.T) {
-	db, mock := newTestDB(t)
+	db, mock := testhelper.NewTestDB(t)
 	defer testhelper.CloseDB(t, db)
 
 	repo := NewRepository(db)
@@ -114,7 +101,7 @@ func TestInsert(t *testing.T) {
 
 // TestInsertNil verifies that inserting a nil incident returns an error.
 func TestInsertNil(t *testing.T) {
-	db, _ := newTestDB(t)
+	db, _ := testhelper.NewTestDB(t)
 	defer testhelper.CloseDB(t, db)
 
 	repo := NewRepository(db)
@@ -127,7 +114,7 @@ func TestInsertNil(t *testing.T) {
 
 // TestUpdateAnalysis verifies that analysis fields are updated correctly.
 func TestUpdateAnalysis(t *testing.T) {
-	db, mock := newTestDB(t)
+	db, mock := testhelper.NewTestDB(t)
 	defer testhelper.CloseDB(t, db)
 
 	repo := NewRepository(db)
@@ -160,7 +147,7 @@ func TestUpdateAnalysis(t *testing.T) {
 
 // TestUpdateAnalysisInvalid verifies that invalid input is rejected.
 func TestUpdateAnalysisInvalid(t *testing.T) {
-	db, _ := newTestDB(t)
+	db, _ := testhelper.NewTestDB(t)
 	defer testhelper.CloseDB(t, db)
 
 	repo := NewRepository(db)
