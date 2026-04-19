@@ -13,13 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package court
 
 import (
 	"context"
 
 	"github.com/ghdrope/court/internal/suit"
-	"github.com/ghdrope/court/pkg/redis"
 	"go.uber.org/zap"
 )
 
@@ -29,17 +29,24 @@ type SuitRepository interface {
 	Close(ctx context.Context, id string) error
 }
 
+// GitHubClient defines the behavior required to publish issues.
+// This allows mocking and loose coupling with implementation.
+type GitHubClient interface {
+	CreateIssue(ctx context.Context, title, body string) error
+}
+
 // Service handles Suit lifecycle creation and updates.
 type Service struct {
 	Repo   SuitRepository
-	Stream *redis.StreamClient
+	GitHub GitHubClient
 	Log    *zap.Logger
 }
 
 // New creates a new Court service instance.
-func New(repo SuitRepository, log *zap.Logger) *Service {
+func New(repo SuitRepository, gh GitHubClient, log *zap.Logger) *Service {
 	return &Service{
-		Repo: repo,
-		Log:  log,
+		Repo:   repo,
+		GitHub: gh,
+		Log:    log,
 	}
 }

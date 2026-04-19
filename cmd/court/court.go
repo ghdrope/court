@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package main
 
 import (
@@ -20,9 +21,11 @@ import (
 	"os"
 
 	"github.com/ghdrope/court/internal/court"
+	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/suit"
 	redisstream "github.com/ghdrope/court/internal/transport/redis"
 	"github.com/ghdrope/court/pkg/env"
+	"github.com/ghdrope/court/pkg/github"
 	"github.com/ghdrope/court/pkg/postgres"
 	redispkg "github.com/ghdrope/court/pkg/redis"
 	goredis "github.com/redis/go-redis/v9"
@@ -35,20 +38,22 @@ import (
 const (
 	defaultRedisAddr = "localhost:6379"
 	defaultDSN       = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
+	defaultRepo      = "ghdrope/court"
 )
 
 // newCourtCommand initializes the Court worker process.
 //
 // The Court service is responsible for:
 //   - Consuming "incident.analyzed" events from Redis Streams
-//   - Creating Suit records based on analyzed incidents
-//   - Ensuring idempotent creation of suits per incident
-//   - Persisting legal case state into PostgreSQL
+//   - Creating Suit records for validated incidents
+//   - Publishing GitHub issues
 func newCourtCommand() *cobra.Command {
 
 	var (
-		redisAddr string
-		dsn       string
+		redisAddr   string
+		dsn         string
+		githubToken string
+		githubRepo  string
 	)
 
 	cmd := &cobra.Command{
@@ -60,7 +65,8 @@ func newCourtCommand() *cobra.Command {
 			ctx := cmd.Context()
 			logger := zap.L().With(zap.String("component", "court"))
 
-			// Resolve configuration (flag > env > default)
+			// --- Configuration resolution ---
+			// Priority: CLI flags > environment variables > default
 			databaseURL := env.FirstNonEmpty(
 				dsn,
 				env.Get("DATABASE_URL", defaultDSN),
@@ -71,7 +77,17 @@ func newCourtCommand() *cobra.Command {
 				env.Get("REDIS_ADDR", defaultRedisAddr),
 			)
 
-			// --- PostgreSQL ---
+			ghToken := env.FirstNonEmpty(
+				githubToken,
+				env.Get("GITHUB_TOKEN", ""),
+			)
+
+			ghRepo := env.FirstNonEmpty(
+				githubRepo,
+				env.Get("GITHUB_REPO", defaultRepo),
+			)
+
+			// --- PostgreSQL initialization ---
 			// Initialize PostgreSQL connection.
 			// This is required for persisting suit storage.
 			db, err := postgres.Open(databaseURL)
@@ -84,20 +100,20 @@ func newCourtCommand() *cobra.Command {
 				}
 			}()
 
-			// Ensure DB is ready before processing events
+			// Ensure database is reachable before starting consumers.
 			if err := postgres.PingWithRetry(cmd.Context(), db); err != nil {
 				return fmt.Errorf("db not ready: %w", err)
 			}
 
-			// Repository layer.
+			// Repository handles persistence of suits.
 			repo := suit.NewRepository(db)
 
-			// Ensure schema is up to date
+			// Ensure schema is applied before processing events.
 			if err := repo.InitSchema(cmd.Context()); err != nil {
 				return err
 			}
 
-			// --- Redis ---
+			// --- Redis stream setup ---
 			// Initialize Redis client used for consuming incident.analyzed stream
 			rdb := goredis.NewClient(&goredis.Options{
 				Addr: redisAddress,
@@ -112,22 +128,40 @@ func newCourtCommand() *cobra.Command {
 				Consumer: consumerName,
 			})
 
-			// Court service handles Suit lifecycle creation
-			svc := court.New(repo, logger)
+			// --- GitHub integration ---
+			// Optional integration used to publish incidents as GitHub issues.
+			var ghClient *github.Client
+			if ghToken != "" {
+				logger.Info("github integration enabled", zap.String("repo", ghRepo))
+				ghClient = github.NewClient(ghToken, ghRepo)
+			} else {
+				logger.Warn("github integration disabled (no token provided)")
+			}
 
-			// Redis Stream consumer for analyzed incidents
-			consumer := redisstream.NewIncidentAnalyzedConsumer(streamClient, logger)
+			// Court service orchestrates suit creation and external side-effects.
+			svc := court.New(repo, ghClient, logger)
+
+			// Incident repository is required to hydrate full incident data
+			// from the event stream payload (ID-only events).
+			incidentRepo := incident.NewRepository(db)
+
+			// Consumer processes analyzed incidents and triggers suit creation.
+			consumer := redisstream.NewIncidentAnalyzedConsumer(streamClient, incidentRepo, logger)
 
 			logger.Info("court started",
 				zap.String("consumer", consumerName),
 			)
 
+			// Start event consumption loop.
 			return consumer.Start(ctx, svc)
 		},
 	}
 
+	// --- CLI flags ---
 	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
 	cmd.Flags().StringVar(&dsn, "database-url", "", "PostgreSQL DSN")
+	cmd.Flags().StringVar(&githubToken, "github-token", "", "GitHub API token")
+	cmd.Flags().StringVar(&githubRepo, "github-repo", defaultRepo, "GitHub repository (owner/repo)")
 
 	return cmd
 }

@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package court
 
 import (
@@ -20,22 +21,24 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/suit"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
-// CreateSuit creates a Suit from an analyzed incident.
-func (s *Service) CreateSuit(ctx context.Context, incidentID string) error {
+// CreateSuit creates a Suit from an analyzed incident and
+// publishes a GitHub issue.
+func (s *Service) CreateSuit(ctx context.Context, inc *incident.IncidentReport) error {
 
-	if incidentID == "" {
-		return fmt.Errorf("incidentID is empty")
+	if inc == nil {
+		return fmt.Errorf("incident is nil")
 	}
 
-	log := s.Log.With(zap.String("incident_id", incidentID))
+	log := s.Log.With(zap.String("incident_id", inc.ID))
 
 	// Check if suit already exists
-	existing, err := s.Repo.GetByIncidentID(ctx, incidentID)
+	existing, err := s.Repo.GetByIncidentID(ctx, inc.ID)
 	if err == nil && existing != nil {
 		log.Info("suit already exists, skipping creation")
 		return nil
@@ -45,7 +48,7 @@ func (s *Service) CreateSuit(ctx context.Context, incidentID string) error {
 
 	newSuit := &suit.Suit{
 		ID:         uuid.NewString(),
-		IncidentID: incidentID,
+		IncidentID: inc.ID,
 		Status:     suit.StatusOpen,
 		CreatedAt:  time.Now(),
 	}
@@ -58,6 +61,12 @@ func (s *Service) CreateSuit(ctx context.Context, incidentID string) error {
 	log.Info("suit created",
 		zap.String("suit_id", newSuit.ID),
 	)
+
+	if s.GitHub != nil {
+		if err := s.createGitHubIssue(ctx, inc); err != nil {
+			log.Error("failed to create github issue", zap.Error(err))
+		}
+	}
 
 	return nil
 }
