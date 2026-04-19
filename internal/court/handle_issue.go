@@ -25,7 +25,11 @@ import (
 )
 
 // createGitHubIssue builds and sends the issue to GitHub.
-func (s *Service) createGitHubIssue(ctx context.Context, inc *incident.IncidentReport) error {
+func (s *Service) createGitHubIssue(ctx context.Context, inc *incident.IncidentReport) (string, error) {
+
+	if s.GitHub == nil {
+		return "", nil
+	}
 
 	title := fmt.Sprintf("Court Incident %s", inc.ID)
 	body := buildIssueBody(inc)

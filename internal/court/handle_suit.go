@@ -53,6 +53,16 @@ func (s *Service) CreateSuit(ctx context.Context, inc *incident.IncidentReport) 
 		CreatedAt:  time.Now(),
 	}
 
+	// Creating GitHub issue if integration is enabled
+	if s.GitHub != nil {
+		issueURL, err := s.createGitHubIssue(ctx, inc)
+		if err != nil {
+			log.Error("failed to create github issue", zap.Error(err))
+		} else {
+			newSuit.GitHubIssueURL = issueURL
+		}
+	}
+
 	if err := s.Repo.Insert(ctx, newSuit); err != nil {
 		log.Error("failed to insert suit", zap.Error(err))
 		return err
@@ -61,12 +71,6 @@ func (s *Service) CreateSuit(ctx context.Context, inc *incident.IncidentReport) 
 	log.Info("suit created",
 		zap.String("suit_id", newSuit.ID),
 	)
-
-	if s.GitHub != nil {
-		if err := s.createGitHubIssue(ctx, inc); err != nil {
-			log.Error("failed to create github issue", zap.Error(err))
-		}
-	}
 
 	return nil
 }
