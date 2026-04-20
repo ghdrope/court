@@ -24,22 +24,17 @@ type IncidentReport struct {
 	// Identity uniquely identifies the incident.
 	ID string
 
-	// Target workload identity
+	// Target workload identity.
 	Cluster   string
 	Namespace string
 	Pod       string
 
-	// Core diagnostic evidence extracted from Kubernetes events.
+	// K8s diagnostic events.
 	Events []K8sEvent
 
 	// ContainerIssues contains all containers in the Pod that are
 	// associated with the recognized failure condition.
 	ContainerIssues []ContainerIssue
-
-	// Analysis contains the Prosecutor's evaluation of the incident.
-	//
-	// Filled by Prosecutor, empty at Officer level
-	Analysis *ProsecutorAnalysis
 }
 
 // K8sEvent represents a single Kubernetes event associated with a Pod.
@@ -56,13 +51,13 @@ type IncidentReport struct {
 //	    Message: "Pulling image \"app/latest\"",
 //	}
 type K8sEvent struct {
-	// Type of event (Normal, Warning, etc.)
+	// Type of event (Normal, Warning, etc.).
 	Type string
 
-	// Reason is the Kubernetes event reason (e.g., Failed, Killing, BackOff)
+	// Reason is the Kubernetes event reason (e.g., Failed, Killing, BackOff).
 	Reason string
 
-	// Message is the human-readable event description
+	// Message is the human-readable event description.
 	Message string
 }
 
@@ -72,21 +67,12 @@ type ContainerIssue struct {
 	// Container is the name of the container within the Pod.
 	Container string
 
+	// ImageName is the image running in this container at the time of failure.
+	ImageName string
+
 	// Reason is the raw Kubernetes termination reason.
 	Reason string
 
 	// Logs contains a bounded snapshot of container logs relevant to the failure.
 	Logs []string
-}
-
-// ProsecutorAnalysis represents the result of analysing an incident,
-// including contextual inputs and the generated commentary.
-type ProsecutorAnalysis struct {
-	// RelatedRepoURL points to the repository likely associated
-	// with the workload incident.
-	RelatedRepoURL string
-
-	// Commentary contains the human-readable analysis generated
-	// by the Prosecutor, LLM-based reasoning.
-	Commentary string
 }

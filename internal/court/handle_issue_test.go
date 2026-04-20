@@ -57,10 +57,6 @@ func TestCreateGitHubIssue(t *testing.T) {
 				Logs:      []string{"error line 1", "error line 2"},
 			},
 		},
-
-		Analysis: &incident.ProsecutorAnalysis{
-			Commentary: "Likely memory issue in container startup.",
-		},
 	}
 
 	url, err := svc.createGitHubIssue(context.Background(), inc)

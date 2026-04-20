@@ -84,8 +84,6 @@ func TestInsert(t *testing.T) {
 			inc.Pod,
 			sqlmock.AnyArg(), // events JSON
 			sqlmock.AnyArg(), // issues JSON
-			"",               // commentary
-			"",               // repo URL
 		).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
@@ -109,56 +107,5 @@ func TestInsertNil(t *testing.T) {
 	err := repo.Insert(context.Background(), nil)
 	if err == nil {
 		t.Fatal("expected error for nil incident")
-	}
-}
-
-// TestUpdateAnalysis verifies that analysis fields are updated correctly.
-func TestUpdateAnalysis(t *testing.T) {
-	db, mock := testhelper.NewTestDB(t)
-	defer testhelper.CloseDB(t, db)
-
-	repo := NewRepository(db)
-
-	inc := &IncidentReport{
-		ID: "test-id",
-		Analysis: &ProsecutorAnalysis{
-			Commentary:     "analysis result",
-			RelatedRepoURL: "https://repo",
-		},
-	}
-
-	mock.ExpectExec("UPDATE incidents").
-		WithArgs(
-			inc.Analysis.Commentary,
-			inc.Analysis.RelatedRepoURL,
-			inc.ID,
-		).
-		WillReturnResult(sqlmock.NewResult(1, 1))
-
-	err := repo.UpdateAnalysis(context.Background(), inc)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("unmet expectations: %v", err)
-	}
-}
-
-// TestUpdateAnalysisInvalid verifies that invalid input is rejected.
-func TestUpdateAnalysisInvalid(t *testing.T) {
-	db, _ := testhelper.NewTestDB(t)
-	defer testhelper.CloseDB(t, db)
-
-	repo := NewRepository(db)
-
-	err := repo.UpdateAnalysis(context.Background(), nil)
-	if err == nil {
-		t.Fatal("expected error for nil incident")
-	}
-
-	err = repo.UpdateAnalysis(context.Background(), &IncidentReport{})
-	if err == nil {
-		t.Fatal("expected error for missing analysis")
 	}
 }
