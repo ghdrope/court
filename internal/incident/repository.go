@@ -49,6 +49,8 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 		namespace TEXT NOT NULL,
 		pod TEXT NOT NULL,
 
+		github_repo_url TEXT,
+
 		events JSONB NOT NULL DEFAULT '[]',
 		container_issues JSONB NOT NULL DEFAULT '[]',
 
@@ -89,14 +91,16 @@ INSERT INTO incidents (
 	cluster,
 	namespace,
 	pod,
+	github_repo_url,
 	events,
 	container_issues
 )
-VALUES ($1,$2,$3,$4,$5,$6)
+VALUES ($1,$2,$3,$4,$5,$6,$7)
 ON CONFLICT (id) DO UPDATE SET
 	cluster = EXCLUDED.cluster,
 	namespace = EXCLUDED.namespace,
 	pod = EXCLUDED.pod,
+	github_repo_url = EXCLUDED.github_repo_url,
 	events = EXCLUDED.events,
 	container_issues = EXCLUDED.container_issues,
 	updated_at = NOW()
@@ -109,6 +113,7 @@ ON CONFLICT (id) DO UPDATE SET
 		inc.Cluster,
 		inc.Namespace,
 		inc.Pod,
+		inc.GitHubRepoURL,
 		eventsJSON,
 		issuesJSON,
 	)
@@ -131,6 +136,7 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 		cluster,
 		namespace,
 		pod,
+		github_repo_url,
 		events,
 		container_issues
 	FROM incidents
@@ -149,6 +155,7 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 			&inc.Cluster,
 			&inc.Namespace,
 			&inc.Pod,
+			&inc.GitHubRepoURL,
 			&eventsJSON,
 			&issuesJSON,
 		)

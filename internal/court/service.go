@@ -32,7 +32,7 @@ type SuitRepository interface {
 // GitHubClient defines the behavior required to publish issues.
 // This allows mocking and loose coupling with implementation.
 type GitHubClient interface {
-	CreateIssue(ctx context.Context, title, body string) (string, error)
+	CreateIssue(ctx context.Context, owner, repo, title, body string) (string, error)
 }
 
 // Service handles Suit lifecycle creation and updates.

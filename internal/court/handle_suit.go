@@ -55,11 +55,16 @@ func (s *Service) CreateSuit(ctx context.Context, inc *incident.IncidentReport) 
 
 	// Creating GitHub issue if integration is enabled
 	if s.GitHub != nil {
-		issueURL, err := s.createGitHubIssue(ctx, inc)
-		if err != nil {
-			log.Error("failed to create github issue", zap.Error(err))
+
+		if inc.GitHubRepoURL == "" {
+			log.Info("skipping github issue creation: missing repository url")
 		} else {
-			newSuit.GitHubIssueURL = issueURL
+			issueURL, err := s.createGitHubIssue(ctx, inc)
+			if err != nil {
+				log.Error("failed to create github issue", zap.Error(err))
+			} else {
+				newSuit.GitHubIssueURL = issueURL
+			}
 		}
 	}
 

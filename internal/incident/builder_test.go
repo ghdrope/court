@@ -28,6 +28,7 @@ func TestBuildFromPod_Success(t *testing.T) {
 	pod := testhelper.NewTestPod("default", "pod-1")
 
 	cluster := "test-cluster"
+	repoURL := "https://github.com/org/repo"
 
 	events := []K8sEvent{
 		{
@@ -45,7 +46,7 @@ func TestBuildFromPod_Success(t *testing.T) {
 		},
 	}
 
-	report, err := BuildFromPod(pod, cluster, events, containerIssues)
+	report, err := BuildFromPod(pod, cluster, repoURL, events, containerIssues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -67,6 +68,11 @@ func TestBuildFromPod_Success(t *testing.T) {
 	// Validate identity mapping
 	if report.Pod != "pod-1" {
 		t.Errorf("unexpected pod: got %s, want %s", report.Pod, "pod-1")
+	}
+
+	// Validate repo propagation
+	if report.GitHubRepoURL != repoURL {
+		t.Errorf("expected repoURL %s, got %s", repoURL, report.GitHubRepoURL)
 	}
 
 	if report.Namespace != "default" {
@@ -113,7 +119,7 @@ func TestBuildFromPod_Success(t *testing.T) {
 // TestBuildFromPod_NilPod ensures nil pod input returns an error
 // and does not produce a valid IncidentReport.
 func TestBuildFromPod_NilPod(t *testing.T) {
-	report, err := BuildFromPod(nil, "", nil, nil)
+	report, err := BuildFromPod(nil, "", "", nil, nil)
 
 	if err == nil {
 		t.Fatal("expected error for nil pod")
@@ -129,7 +135,7 @@ func TestBuildFromPod_NilPod(t *testing.T) {
 func TestBuildFromPod_EmptySlices(t *testing.T) {
 	pod := testhelper.NewTestPod("default", "pod-empty")
 
-	report, err := BuildFromPod(pod, "cluster", nil, nil)
+	report, err := BuildFromPod(pod, "cluster", "", nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -169,7 +175,7 @@ func TestBuildFromPod_TableDriven(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pod := testhelper.NewTestPod(tt.namespace, tt.podName)
 
-			report, err := BuildFromPod(pod, "cluster", nil, nil)
+			report, err := BuildFromPod(pod, "cluster", "", nil, nil)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

@@ -37,10 +37,11 @@ func TestCreateGitHubIssue(t *testing.T) {
 	}
 
 	inc := &incident.IncidentReport{
-		ID:        "incident-123",
-		Cluster:   "test-cluster",
-		Namespace: "default",
-		Pod:       "api-pod",
+		ID:            "incident-123",
+		Cluster:       "test-cluster",
+		Namespace:     "default",
+		Pod:           "api-pod",
+		GitHubRepoURL: "https://github.com/ghdrope/court",
 
 		Events: []incident.K8sEvent{
 			{
@@ -61,28 +62,34 @@ func TestCreateGitHubIssue(t *testing.T) {
 
 	url, err := svc.createGitHubIssue(context.Background(), inc)
 
+	// Assertions: no error expected
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
+	// Must return a URL from mock
 	if url == "" {
-		t.Fatal("exected issue URL, got empty string")
+		t.Fatal("expected issue URL, got empty string")
 	}
 
+	// Ensure GitHub client was invoked
 	if !gh.Called {
 		t.Fatal("expected GitHub CreateIssue to be called")
 	}
 
+	// Validate title composition
 	if gh.Title != "Court Incident incident-123" {
 		t.Errorf("unexpected title: %s", gh.Title)
 	}
 
-	if gh.Body == "" {
-		t.Fatal("expected non-empty issue body")
+	// Validate title composition
+	if gh.Title != "Court Incident incident-123" {
+		t.Errorf("unexpected title: got %s", gh.Title)
 	}
 
+	// Validate body generation
 	if gh.Body == "" {
-		t.Fatal("issue body is empty")
+		t.Fatal("expected non-empty issue body")
 	}
 
 	if len(gh.Body) < 50 {
