@@ -52,9 +52,6 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 		events JSONB NOT NULL DEFAULT '[]',
 		container_issues JSONB NOT NULL DEFAULT '[]',
 
-		commentary TEXT NOT NULL DEFAULT '',
-		related_repo_url TEXT NOT NULL DEFAULT '',
-
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	);
@@ -86,14 +83,6 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
 		return err
 	}
 
-	commentary := ""
-	repoURL := ""
-
-	if inc.Analysis != nil {
-		commentary = inc.Analysis.Commentary
-		repoURL = inc.Analysis.RelatedRepoURL
-	}
-
 	query := `
 INSERT INTO incidents (
 	id,
@@ -101,19 +90,15 @@ INSERT INTO incidents (
 	namespace,
 	pod,
 	events,
-	container_issues,
-	commentary,
-	related_repo_url
+	container_issues
 )
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+VALUES ($1,$2,$3,$4,$5,$6)
 ON CONFLICT (id) DO UPDATE SET
 	cluster = EXCLUDED.cluster,
 	namespace = EXCLUDED.namespace,
 	pod = EXCLUDED.pod,
 	events = EXCLUDED.events,
 	container_issues = EXCLUDED.container_issues,
-	commentary = EXCLUDED.commentary,
-	related_repo_url = EXCLUDED.related_repo_url,
 	updated_at = NOW()
 `
 
@@ -126,8 +111,6 @@ ON CONFLICT (id) DO UPDATE SET
 		inc.Pod,
 		eventsJSON,
 		issuesJSON,
-		commentary,
-		repoURL,
 	)
 
 	if err != nil {
@@ -149,9 +132,7 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 		namespace,
 		pod,
 		events,
-		container_issues,
-		commentary,
-		related_repo_url
+		container_issues
 	FROM incidents
 	WHERE id = $1
 	`
@@ -160,8 +141,6 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 		inc        IncidentReport
 		eventsJSON []byte
 		issuesJSON []byte
-		commentary string
-		repoURL    string
 	)
 
 	err := r.DB.QueryRowContext(ctx, query, id).
@@ -172,8 +151,6 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 			&inc.Pod,
 			&eventsJSON,
 			&issuesJSON,
-			&commentary,
-			&repoURL,
 		)
 
 	if err != nil {
@@ -191,43 +168,5 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 		return nil, fmt.Errorf("unmarshal container issues: %w", err)
 	}
 
-	if commentary != "" || repoURL != "" {
-		inc.Analysis = &ProsecutorAnalysis{
-			Commentary:     commentary,
-			RelatedRepoURL: repoURL,
-		}
-	}
 	return &inc, nil
-}
-
-// UpdateAnalysis updates the Prosecutor-generated analysis.
-//
-// This includes LLM commentary and optional repository reference.
-func (r *Repository) UpdateAnalysis(ctx context.Context, inc *IncidentReport) error {
-	if inc == nil || inc.Analysis == nil {
-		return fmt.Errorf("invalid incident analysis")
-	}
-
-	query := `
-	UPDATE incidents
-	SET
-		commentary = $1,
-		related_repo_url = $2,
-		updated_at = NOW()
-	WHERE id = $3
-	`
-
-	_, err := r.DB.ExecContext(
-		ctx,
-		query,
-		inc.Analysis.Commentary,
-		inc.Analysis.RelatedRepoURL,
-		inc.ID,
-	)
-
-	if err != nil {
-		return fmt.Errorf("update incident analysis: %w", err)
-	}
-
-	return nil
 }

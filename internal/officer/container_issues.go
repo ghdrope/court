@@ -40,7 +40,7 @@ func DetectContainerIssues(ctx context.Context, client kubernetes.Interface, pod
 		return nil
 	}
 
-	issues := make([]incident.ContainerIssue, 0)
+	var issues []incident.ContainerIssue
 
 	for _, cs := range pod.Status.ContainerStatuses {
 
@@ -48,53 +48,58 @@ func DetectContainerIssues(ctx context.Context, client kubernetes.Interface, pod
 
 			issue := incident.ContainerIssue{
 				Container: cs.Name,
+				ImageName: cs.Image,
 				Reason:    reason,
 			}
 
 			// Only fetch logs if issue is meaningful
 			// (avoid overhead for healthy containers)
-			if pod.Namespace != "" && pod.Name != "" {
-				logs := fetchContainerLogs(
-					ctx,
-					client,
-					pod.Namespace,
-					pod.Name,
-					cs.Name,
-				)
+			logs := fetchContainerLogs(
+				ctx,
+				client,
+				pod.Namespace,
+				pod.Name,
+				cs.Name,
+			)
 
-				if len(logs) > 0 {
-					issue.Logs = logs
-				} else {
-					issue.Logs = []string{"<no logs available>"}
-				}
+			if len(logs) == 0 {
+				issue.Logs = []string{"<no logs available>"}
+			} else {
+				issue.Logs = logs
 			}
 
 			issues = append(issues, issue)
 		}
 
 		// Detect containers stuck in waiting states due to runtime issues.
-		if cs.State.Waiting != nil {
-			switch cs.State.Waiting.Reason {
-			case "CrashLoopBackOff", "ImagePullBackOff":
-				add(cs.State.Waiting.Reason)
-			default:
-				add(cs.State.Waiting.Reason)
-			}
-		}
-
-		// Detect containers terminated due to out-of-memory conditions.
 		if cs.State.Terminated != nil {
 
-			reason := cs.State.Terminated.Reason
-			exitCode := cs.State.Terminated.ExitCode
-
-			finalReason := reason
-
-			if exitCode != 0 {
-				finalReason = fmt.Sprintf("%s (ExitCode=%d)", reason, exitCode)
+			if cs.State.Terminated.ExitCode != 0 {
+				reason := fmt.Sprintf(
+					"%s (exit=%d)",
+					cs.State.Terminated.Reason,
+					cs.State.Terminated.ExitCode,
+				)
+				add(reason)
 			}
 
-			add(finalReason)
+			continue
+		}
+
+		if cs.State.Waiting != nil {
+
+			switch cs.State.Waiting.Reason {
+
+			case "CrashLoopBackOff",
+				"ImagePullBackOff",
+				"ErrImagePull",
+				"RunContainerError":
+
+				add(cs.State.Waiting.Reason)
+
+			default:
+				continue
+			}
 		}
 	}
 
@@ -137,11 +142,11 @@ func fetchContainerLogs(
 			lines = append(lines, scanner.Text())
 		}
 
-		if len(lines) <= maxLines {
-			return lines
+		if len(lines) > maxLines {
+			return lines[len(lines)-maxLines:]
 		}
 
-		return lines[len(lines)-maxLines:]
+		return lines
 	}
 
 	// 1. current logs
@@ -155,7 +160,8 @@ func fetchContainerLogs(
 		return current
 	}
 
-	out := make([]string, 0, len(previous)+len(current)+1)
+	out := make([]string, 0, len(previous)+len(current)+2)
+
 	out = append(out, "--- PREVIOUS CONTAINER LOGS ---")
 	out = append(out, previous...)
 	out = append(out, "--- CURRENT CONTAINER LOGS ---")

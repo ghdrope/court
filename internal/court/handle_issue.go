@@ -56,33 +56,40 @@ func buildIssueBody(inc *incident.IncidentReport) string {
 	for _, i := range inc.ContainerIssues {
 
 		logs := "no logs available"
+
 		if len(i.Logs) > 0 {
-			// Limit logs to avoid exceeding GitHub issue size limits
-			max := 3
-			if len(i.Logs) < max {
-				max = len(i.Logs)
+			max := 5
+			truncated := false
+
+			if len(i.Logs) > max {
+				truncated = true
 			}
-			logs = strings.Join(i.Logs[:max], "\n")
+
+			limit := max
+			if len(i.Logs) < max {
+				limit = len(i.Logs)
+			}
+
+			logs = strings.Join(i.Logs[:limit], "\n")
+
+			if truncated {
+				logs += "\n... (truncated)"
+			}
 		}
 
 		entry := fmt.Sprintf(
-			`- Container: %s
-  Reason: %s
-  Logs:
-  `+"```"+`
-%s
-  `+"```",
+			"- Container: `%s`\n"+
+				"  Image: `%s`\n"+
+				"  Reason: `%s`\n"+
+				"  Logs:\n\n"+
+				"```bash\n%s\n```",
 			i.Container,
+			i.ImageName,
 			i.Reason,
-			logs,
+			formatLogs(logs),
 		)
 
 		issues = append(issues, entry)
-	}
-
-	analysis := "No analysis available."
-	if inc.Analysis != nil && inc.Analysis.Commentary != "" {
-		analysis = inc.Analysis.Commentary
 	}
 
 	return fmt.Sprintf(`
@@ -100,9 +107,6 @@ Your incident was caught at:
 ## Container Issues
 %s
 
-## Prosecutor Insights
-%s
-
 ---
 
 💡 As a productivity tip you can use GitHub Copilot to help investigate and fix this issue.
@@ -114,7 +118,6 @@ Thank you for using Court!
 		inc.Pod,
 		joinOrFallback(events),
 		joinOrFallback(issues),
-		analysis,
 	)
 }
 
@@ -124,4 +127,17 @@ func joinOrFallback(items []string) string {
 		return "_No data available_"
 	}
 	return strings.Join(items, "\n")
+}
+
+// indentLogs ensures logs render correctly inside GitHub Markdown list items.
+// Without indentation, fenced code blocks break out of list context.
+func formatLogs(logs string) string {
+	// ensures logs are safe inside fenced code block
+	logs = strings.TrimSpace(logs)
+
+	if logs == "" {
+		return "<no logs available>"
+	}
+
+	return logs
 }

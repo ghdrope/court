@@ -27,10 +27,6 @@ import (
 //
 // This function acts as a translation layer between Kubernetes
 // runtime state and the IncidentReport model.
-//
-// The resulting IncidentReport contains only data available at the
-// Officer stage. Prosecutor-specific fields (Analysis) are left empty
-// and are expected to be populated in a later processing phase.
 func BuildFromPod(
 	pod *v1.Pod,
 	cluster string,
@@ -56,8 +52,5 @@ func BuildFromPod(
 
 		// Container-level evidence
 		ContainerIssues: containerIssues,
-
-		// Prosecutor analysis is not available at Officer stage
-		Analysis: nil,
 	}, nil
 }
