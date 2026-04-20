@@ -23,11 +23,14 @@ import (
 	"github.com/ghdrope/court/internal/court"
 	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/suit"
+
 	redisstream "github.com/ghdrope/court/internal/transport/redis"
+
 	"github.com/ghdrope/court/pkg/env"
 	"github.com/ghdrope/court/pkg/github"
 	"github.com/ghdrope/court/pkg/postgres"
 	redispkg "github.com/ghdrope/court/pkg/redis"
+
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -59,7 +62,6 @@ func newCourtCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "court",
 		Short: "Start Court worker",
-		Long:  "Court consumes analyzed incidents and creates suits in the archive system.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			ctx := cmd.Context()
@@ -67,25 +69,13 @@ func newCourtCommand() *cobra.Command {
 
 			// --- Configuration resolution ---
 			// Priority: CLI flags > environment variables > default
-			databaseURL := env.FirstNonEmpty(
-				dsn,
-				env.Get("DATABASE_URL", defaultDSN),
-			)
+			databaseURL := env.FirstNonEmpty(dsn, env.Get("DATABASE_URL", defaultDSN))
 
-			redisAddress := env.FirstNonEmpty(
-				redisAddr,
-				env.Get("REDIS_ADDR", defaultRedisAddr),
-			)
+			redisAddress := env.FirstNonEmpty(redisAddr, env.Get("REDIS_ADDR", defaultRedisAddr))
 
-			ghToken := env.FirstNonEmpty(
-				githubToken,
-				env.Get("GITHUB_TOKEN", ""),
-			)
+			ghToken := env.FirstNonEmpty(githubToken, env.Get("GITHUB_TOKEN", ""))
 
-			ghRepo := env.FirstNonEmpty(
-				githubRepo,
-				env.Get("GITHUB_REPO", defaultRepo),
-			)
+			ghRepo := env.FirstNonEmpty(githubRepo, env.Get("GITHUB_REPO", defaultRepo))
 
 			// --- PostgreSQL initialization ---
 			// Initialize PostgreSQL connection.
@@ -106,12 +96,14 @@ func newCourtCommand() *cobra.Command {
 			}
 
 			// Repository handles persistence of suits.
-			repo := suit.NewRepository(db)
+			suitRepo := suit.NewRepository(db)
 
 			// Ensure schema is applied before processing events.
-			if err := repo.InitSchema(cmd.Context()); err != nil {
+			if err := suitRepo.InitSchema(ctx); err != nil {
 				return err
 			}
+
+			incidentRepo := incident.NewRepository(db)
 
 			// --- Redis stream setup ---
 			// Initialize Redis client used for consuming incident.analyzed stream
@@ -122,9 +114,9 @@ func newCourtCommand() *cobra.Command {
 			hostname, _ := os.Hostname()
 			consumerName := fmt.Sprintf("court-%s", hostname)
 
-			streamClient := redispkg.NewStreamClient(rdb, redispkg.Config{
-				Stream:   "incident.analyzed",
-				Group:    "court-group",
+			incidentCreatedClient := redispkg.NewStreamClient(rdb, redispkg.Config{
+				Stream:   redisstream.IncidentCreatedStream,
+				Group:    redisstream.CourtGroup,
 				Consumer: consumerName,
 			})
 
@@ -134,23 +126,15 @@ func newCourtCommand() *cobra.Command {
 			if ghToken != "" {
 				logger.Info("github integration enabled", zap.String("repo", ghRepo))
 				ghClient = github.NewClient(ghToken, ghRepo)
-			} else {
-				logger.Warn("github integration disabled (no token provided)")
 			}
 
 			// Court service orchestrates suit creation and external side-effects.
-			svc := court.New(repo, ghClient, logger)
+			svc := court.New(suitRepo, ghClient, logger)
 
-			// Incident repository is required to hydrate full incident data
-			// from the event stream payload (ID-only events).
-			incidentRepo := incident.NewRepository(db)
+			// Consumer processes created incidents and triggers suit creation.
+			consumer := redisstream.NewIncidentCreatedConsumer(incidentCreatedClient, incidentRepo, logger)
 
-			// Consumer processes analyzed incidents and triggers suit creation.
-			consumer := redisstream.NewIncidentAnalyzedConsumer(streamClient, incidentRepo, logger)
-
-			logger.Info("court started",
-				zap.String("consumer", consumerName),
-			)
+			logger.Info("court started")
 
 			// Start event consumption loop.
 			return consumer.Start(ctx, svc)
