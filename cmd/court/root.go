@@ -26,7 +26,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "court",
 	Short: "Court service for formal case creation",
-	Long:  "Court consumes prosecutor events and creates suits",
+	Long:  "Court consumes officer events and creates suits",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.HelpFunc()(cmd, args)

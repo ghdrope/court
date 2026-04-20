@@ -20,7 +20,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/ghdrope/court/internal/prosecutor"
+	"github.com/ghdrope/court/internal/court"
+	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/pkg/redis"
 	"go.uber.org/zap"
 )
@@ -30,35 +31,40 @@ import (
 // These events are produced by the Officer service when
 // a new IncidentReport is persisted in PostgreSQL.
 const (
-	ProsecutorStream = "incident.created"
-	ProsecutorGroup  = "prosecutor-group"
+	IncidentCreatedStream = "incident.created"
+	CourtGroup            = "court-group"
 )
 
-// IncidentCreatedEvent represents the payload of incident.created events.
+// IncidentCreatedEvent is emitted by Officer when a new incident is created.
 type IncidentCreatedEvent struct {
 	IncidentID string `json:"incident_id"`
+}
+
+// IncidentRepository defines access to incident data.
+type IncidentRepository interface {
+	GetByID(ctx context.Context, id string) (*incident.IncidentReport, error)
 }
 
 // IncidentCreatedConsumer handles incident.created events.
 type IncidentCreatedConsumer struct {
 	Client *redis.StreamClient
+	Repo   IncidentRepository
 	Log    *zap.Logger
 }
 
-// ConsumeIncidentCreation starts the event loop for processing incident.created events.
-//
-// Messages are acknowledged only after successful processing.
-func NewIncidentCreatedConsumer(client *redis.StreamClient, log *zap.Logger) *IncidentCreatedConsumer {
+// NewIncidentCreatedConsumer creates consumer.
+func NewIncidentCreatedConsumer(client *redis.StreamClient, repo IncidentRepository, log *zap.Logger) *IncidentCreatedConsumer {
 	return &IncidentCreatedConsumer{
 		Client: client,
+		Repo:   repo,
 		Log:    log,
 	}
 }
 
-// StartIncidentCreatedConsumer
-func (c *IncidentCreatedConsumer) Start(ctx context.Context, svc *prosecutor.Service) error {
+// StartIncidentCreatedConsumer begins consuming incident.created events.
+func (c *IncidentCreatedConsumer) Start(ctx context.Context, svc *court.Service) error {
 
-	logger := c.Log.With(zap.String("component", "prosecutor-consumer"))
+	logger := c.Log.With(zap.String("component", "court-consumer"))
 
 	if err := c.Client.EnsureGroup(ctx); err != nil {
 		return err
@@ -77,29 +83,16 @@ func (c *IncidentCreatedConsumer) Start(ctx context.Context, svc *prosecutor.Ser
 			return nil
 		}
 
-		logger.Info("event received",
+		logger.Info("incident.created received",
 			zap.String("incident_id", evt.IncidentID),
 		)
 
-		inc, err := svc.Repo.GetByID(ctx, evt.IncidentID)
+		incident, err := c.Repo.GetByID(ctx, evt.IncidentID)
 		if err != nil {
 			logger.Error("failed to fetch incident", zap.Error(err))
 			return err
 		}
 
-		// Process incident
-		logger.Info("starting incident analysis",
-			zap.String("incident_id", evt.IncidentID),
-		)
-		if err := svc.ProcessIncident(ctx, inc); err != nil {
-			logger.Error("failed to process incident", zap.Error(err))
-			return err
-		}
-
-		logger.Info("incident processed",
-			zap.String("incident_id", evt.IncidentID),
-		)
-
-		return nil
+		return svc.CreateSuit(ctx, incident)
 	})
 }
