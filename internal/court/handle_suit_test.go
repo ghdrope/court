@@ -77,7 +77,8 @@ func TestCreateSuit_Success(t *testing.T) {
 	svc := New(repo, gh, logger)
 
 	inc := &incident.IncidentReport{
-		ID: "incident-123",
+		ID:            "incident-123",
+		GitHubRepoURL: "https://github.com/ghdrope/court",
 	}
 
 	err := svc.CreateSuit(context.Background(), inc)

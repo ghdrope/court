@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -36,8 +37,9 @@ type GitHubIssueResponse struct {
 }
 
 // CreateIssue creates a new GitHub issue.
-func (c *Client) CreateIssue(ctx context.Context, title, body string) (string, error) {
-	url := fmt.Sprintf("%s/repos/%s/issues", c.baseURL, c.repo)
+func (c *Client) CreateIssue(ctx context.Context, owner, repo, title, body string) (string, error) {
+
+	url := fmt.Sprintf("%s/repos/%s/%s/issues", c.baseURL, owner, repo)
 
 	payload := CreateIssueRequest{
 		Title: title,
@@ -67,7 +69,12 @@ func (c *Client) CreateIssue(ctx context.Context, title, body string) (string, e
 	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("github API returned status %d", resp.StatusCode)
+		b, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf(
+			"github API error: status=%d body=%s",
+			resp.StatusCode,
+			string(b),
+		)
 	}
 
 	// Decode response to extract issue URL

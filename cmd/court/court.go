@@ -41,7 +41,6 @@ import (
 const (
 	defaultRedisAddr = "localhost:6379"
 	defaultDSN       = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
-	defaultRepo      = "ghdrope/court"
 )
 
 // newCourtCommand initializes the Court worker process.
@@ -49,14 +48,13 @@ const (
 // The Court service is responsible for:
 //   - Consuming "incident.analyzed" events from Redis Streams
 //   - Creating Suit records for validated incidents
-//   - Publishing GitHub issues
+//   - Creating GitHub issues from incident metadata
 func newCourtCommand() *cobra.Command {
 
 	var (
 		redisAddr   string
 		dsn         string
 		githubToken string
-		githubRepo  string
 	)
 
 	cmd := &cobra.Command{
@@ -74,8 +72,6 @@ func newCourtCommand() *cobra.Command {
 			redisAddress := env.FirstNonEmpty(redisAddr, env.Get("REDIS_ADDR", defaultRedisAddr))
 
 			ghToken := env.FirstNonEmpty(githubToken, env.Get("GITHUB_TOKEN", ""))
-
-			ghRepo := env.FirstNonEmpty(githubRepo, env.Get("GITHUB_REPO", defaultRepo))
 
 			// --- PostgreSQL initialization ---
 			// Initialize PostgreSQL connection.
@@ -95,17 +91,17 @@ func newCourtCommand() *cobra.Command {
 				return fmt.Errorf("db not ready: %w", err)
 			}
 
+			// --- Repositories ---
 			// Repository handles persistence of suits.
 			suitRepo := suit.NewRepository(db)
+			incidentRepo := incident.NewRepository(db)
 
 			// Ensure schema is applied before processing events.
 			if err := suitRepo.InitSchema(ctx); err != nil {
 				return err
 			}
 
-			incidentRepo := incident.NewRepository(db)
-
-			// --- Redis stream setup ---
+			// --- Redis setup ---
 			// Initialize Redis client used for consuming incident.analyzed stream
 			rdb := goredis.NewClient(&goredis.Options{
 				Addr: redisAddress,
@@ -120,17 +116,20 @@ func newCourtCommand() *cobra.Command {
 				Consumer: consumerName,
 			})
 
-			// --- GitHub integration ---
+			// --- GitHub client ---
 			// Optional integration used to publish incidents as GitHub issues.
-			var ghClient *github.Client
+			var ghClient court.GitHubClient
+
 			if ghToken != "" {
-				logger.Info("github integration enabled", zap.String("repo", ghRepo))
-				ghClient = github.NewClient(ghToken, ghRepo)
+				logger.Info("github integration enabled")
+				ghClient = github.NewClient(ghToken)
 			}
 
+			// --- Court service ---
 			// Court service orchestrates suit creation and external side-effects.
 			svc := court.New(suitRepo, ghClient, logger)
 
+			// --- Consumer ---
 			// Consumer processes created incidents and triggers suit creation.
 			consumer := redisstream.NewIncidentCreatedConsumer(incidentCreatedClient, incidentRepo, logger)
 
@@ -145,7 +144,6 @@ func newCourtCommand() *cobra.Command {
 	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
 	cmd.Flags().StringVar(&dsn, "database-url", "", "PostgreSQL DSN")
 	cmd.Flags().StringVar(&githubToken, "github-token", "", "GitHub API token")
-	cmd.Flags().StringVar(&githubRepo, "github-repo", defaultRepo, "GitHub repository (owner/repo)")
 
 	return cmd
 }

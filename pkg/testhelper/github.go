@@ -24,6 +24,8 @@ import "context"
 type GitHubMock struct {
 	Called bool
 
+	Owner string
+	Repo  string
 	Title string
 	Body  string
 
@@ -32,8 +34,11 @@ type GitHubMock struct {
 }
 
 // CreateIssue records the call and returns a predefined error if set.
-func (m *GitHubMock) CreateIssue(ctx context.Context, title, body string) (string, error) {
+func (m *GitHubMock) CreateIssue(ctx context.Context, owner, repo, title, body string) (string, error) {
+
 	m.Called = true
+	m.Title = title
+	m.Body = body
 	m.Title = title
 	m.Body = body
 

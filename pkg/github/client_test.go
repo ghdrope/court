@@ -25,9 +25,8 @@ import (
 func TestNewClient(t *testing.T) {
 
 	token := "test-token"
-	repo := "owner/repo"
 
-	client := NewClient(token, repo)
+	client := NewClient(token)
 
 	if client == nil {
 		t.Fatal("expected client, got nil")
@@ -35,10 +34,6 @@ func TestNewClient(t *testing.T) {
 
 	if client.token != token {
 		t.Fatalf("expected token %s, got %s", token, client.token)
-	}
-
-	if client.repo != repo {
-		t.Fatalf("expected repo %s, got %s", repo, client.repo)
 	}
 
 	if client.httpClient == nil {
@@ -56,10 +51,9 @@ func TestNewClient(t *testing.T) {
 func TestNewClient_Deterministic(t *testing.T) {
 
 	token := "test-token"
-	repo := "owner/repo"
 
-	c1 := NewClient(token, repo)
-	c2 := NewClient(token, repo)
+	c1 := NewClient(token)
+	c2 := NewClient(token)
 
 	if c1 == c2 {
 		t.Fatal("expected different instances, got same pointer")
@@ -67,10 +61,6 @@ func TestNewClient_Deterministic(t *testing.T) {
 
 	if c1.token != c2.token {
 		t.Fatal("expected same token value")
-	}
-
-	if c1.repo != c2.repo {
-		t.Fatal("expected same repo value")
 	}
 
 	if c1.httpClient == c2.httpClient {

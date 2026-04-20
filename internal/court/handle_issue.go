@@ -19,22 +19,54 @@ package court
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/ghdrope/court/internal/incident"
 )
 
 // createGitHubIssue builds and sends the issue to GitHub.
+//
+// It uses the IncidentReport GitHubRepoURL to determine the target repository.
+// If the repository cannot be resolved, issue creation is skipped.
 func (s *Service) createGitHubIssue(ctx context.Context, inc *incident.IncidentReport) (string, error) {
 
 	if s.GitHub == nil {
 		return "", nil
 	}
 
+	if inc.GitHubRepoURL == "" {
+		return "", fmt.Errorf("missing GitHubRepoURL on incident")
+	}
+
+	owner, repo, err := parseGitHubRepo(inc.GitHubRepoURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid repository url: %w", err)
+	}
+
 	title := fmt.Sprintf("Court Incident %s", inc.ID)
 	body := buildIssueBody(inc)
 
-	return s.GitHub.CreateIssue(ctx, title, body)
+	return s.GitHub.CreateIssue(ctx, owner, repo, title, body)
+}
+
+// parseGitHubRepo extracts owner/repo from a GitHub URL.
+//
+// Example:
+//
+//	https://github.com/org/repo -> org, repo
+func parseGitHubRepo(raw string) (string, string, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", "", err
+	}
+
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("invalid github repo path")
+	}
+
+	return parts[0], parts[1], nil
 }
 
 // buildIssueBody formats the GitHub issue content.

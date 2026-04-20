@@ -25,18 +25,16 @@ import (
 type Client struct {
 	httpClient *http.Client
 	token      string
-	repo       string // format: owner/repo
 	baseURL    string
 }
 
 // NewClient creates a new GitHub API client.
-func NewClient(token, repo string) *Client {
+func NewClient(token string) *Client {
 	return &Client{
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 		token:   token,
-		repo:    repo,
 		baseURL: "https://api.github.com",
 	}
 }

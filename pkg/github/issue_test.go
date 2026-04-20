@@ -60,11 +60,11 @@ func TestCreateIssue_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("test-token", "owner/repo")
+	client := NewClient("test-token")
 	client.httpClient = server.Client()
 	client.baseURL = server.URL
 
-	url, err := client.CreateIssue(context.Background(), "test-title", "test-body")
+	url, err := client.CreateIssue(context.Background(), "owner", "repo", "test-title", "test-body")
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -91,11 +91,11 @@ func TestCreateIssue_HTTPError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient("test-token", "owner/repo")
+	client := NewClient("test-token")
 	client.httpClient = server.Client()
 	client.baseURL = server.URL
 
-	url, err := client.CreateIssue(context.Background(), "title", "body")
+	url, err := client.CreateIssue(context.Background(), "owner", "repo", "title", "body")
 
 	if err == nil {
 		t.Fatal("expected error for non-2xx response")
@@ -109,11 +109,11 @@ func TestCreateIssue_HTTPError(t *testing.T) {
 // TestCreateIssue_RequestError verifies request creation failure.
 func TestCreateIssue_RequestError(t *testing.T) {
 
-	client := NewClient("test-token", "owner/repo")
+	client := NewClient("test-token")
 
 	client.baseURL = "://invalid-url"
 
-	url, err := client.CreateIssue(context.Background(), "title", "body")
+	url, err := client.CreateIssue(context.Background(), "owner", "repo", "title", "body")
 
 	if err == nil {
 		t.Fatal("expected error for invalid request")
