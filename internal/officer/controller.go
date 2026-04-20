@@ -49,6 +49,13 @@ type PodReconciler struct {
 	Service IncidentService
 
 	Cluster string
+
+	// ImageMetaProvider allows resolving OCI image labels
+	// (e.g. org.opencontainers.image.source).
+	//
+	// This is required to enrich IncidentReports with repository metadata
+	// when annotations are not present.
+	ImageMetadataProvider ImageMetadataProvider
 }
 
 // Reconcile evaluates the current state of a Pod and determines whether
@@ -73,12 +80,14 @@ func (r *PodReconciler) Reconcile(
 	// Detect container-level issues
 	containerIssues := DetectContainerIssues(ctx, r.KubeClient, &pod)
 
+	// Fetch Kubernetes events for the Pod
 	events, err := r.fetchPodEvents(ctx, pod.Namespace, &pod)
 	if err != nil {
 		logger.Error(err, "failed to fetch pod events")
 		return ctrl.Result{}, err
 	}
 
+	// Determine if this Pod represents a problem worth reporting
 	isProblem :=
 		pod.Status.Phase == v1.PodFailed ||
 			pod.Status.Phase == v1.PodUnknown ||
@@ -88,10 +97,24 @@ func (r *PodReconciler) Reconcile(
 		return ctrl.Result{}, nil
 	}
 
+	// Resolve GitHub repository URL
+	repoURL := resolveRepositoryURL(
+		ctx,
+		logger,
+		&pod,
+		r.ImageMetadataProvider,
+	)
+
+	if repoURL == "" {
+		logger.Info("github repository could not be resolved for pod",
+			"annotation", "court.dev/repository",
+		)
+	}
 	// Build domain-level incident report
 	report, err := incident.BuildFromPod(
 		&pod,
 		r.Cluster,
+		repoURL,
 		events,
 		containerIssues,
 	)

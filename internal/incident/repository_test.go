@@ -72,6 +72,7 @@ func TestInsert(t *testing.T) {
 		Cluster:         "cluster-1",
 		Namespace:       "default",
 		Pod:             "pod-1",
+		GitHubRepoURL:   "https://github.com/org/repo",
 		Events:          []K8sEvent{},
 		ContainerIssues: []ContainerIssue{},
 	}
@@ -82,6 +83,7 @@ func TestInsert(t *testing.T) {
 			inc.Cluster,
 			inc.Namespace,
 			inc.Pod,
+			inc.GitHubRepoURL,
 			sqlmock.AnyArg(), // events JSON
 			sqlmock.AnyArg(), // issues JSON
 		).

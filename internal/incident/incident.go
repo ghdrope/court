@@ -29,6 +29,15 @@ type IncidentReport struct {
 	Namespace string
 	Pod       string
 
+	// GitHubRepoURL identifies the source repository of the workload.
+	//
+	// It is resolved from:
+	//	- court.dev/repository annotation (preferred)
+	//	- container image metadata (fallback)
+	//
+	// It it cannot be resolved, it will be empty.
+	GitHubRepoURL string
+
 	// K8s diagnostic events.
 	Events []K8sEvent
 

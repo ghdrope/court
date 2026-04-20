@@ -30,6 +30,7 @@ import (
 func BuildFromPod(
 	pod *v1.Pod,
 	cluster string,
+	repoURL string,
 	events []K8sEvent,
 	containerIssues []ContainerIssue,
 ) (IncidentReport, error) {
@@ -46,6 +47,8 @@ func BuildFromPod(
 		Cluster:   cluster,
 		Namespace: pod.Namespace,
 		Pod:       pod.Name,
+
+		GitHubRepoURL: repoURL,
 
 		// Core evidence
 		Events: events,
