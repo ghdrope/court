@@ -116,11 +116,17 @@ func (r *PodReconciler) Reconcile(
 		r.ImageMetadataProvider,
 	)
 
+	// GithubRepoURL must be filled
 	if repoURL == "" {
-		logger.Info("github repository could not be resolved for pod",
-			"annotation", "court.dev/repository",
+		logger.Info("incident skipped: GitHub repository URL could not be resolved",
+			"reason", "missing repository metadata",
+			"resolution_strategy",
+			"ensure either annotation 'court.dev/repository' is set OR OCI image label 'org.opencontainers.image.source' exists",
 		)
+
+		return ctrl.Result{}, nil
 	}
+
 	// Build domain-level incident report
 	report, err := incident.BuildFromPod(
 		&pod,

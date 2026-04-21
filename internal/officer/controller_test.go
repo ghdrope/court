@@ -108,6 +108,9 @@ func TestReconcile_ProblemPod(t *testing.T) {
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      "bad-pod",
 			Namespace: "default",
+			Annotations: map[string]string{
+				"court.dev/repository": "https://github.com/ghdrope/court",
+			},
 		},
 		Status: v1.PodStatus{
 			Phase: v1.PodFailed,
@@ -151,6 +154,9 @@ func TestReconcile_ServiceFailure(t *testing.T) {
 		ObjectMeta: ctrl.ObjectMeta{
 			Name:      "bad-pod",
 			Namespace: "default",
+			Annotations: map[string]string{
+				"court.dev/repository": "https://github.com/ghdrope/court",
+			},
 		},
 		Status: v1.PodStatus{
 			Phase: v1.PodFailed,
