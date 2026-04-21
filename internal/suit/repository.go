@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -121,6 +122,46 @@ func (r *Repository) GetByIncidentID(ctx context.Context, incidentID string) (*S
 	}
 
 	return &s, nil
+}
+
+// ListOpen returns all open suits.
+func (r *Repository) ListOpen(ctx context.Context) ([]Suit, error) {
+	query := `
+	SELECT id, incident_id, status, created_at, closed_at, github_issue_url
+	FROM suits
+	WHERE status = $1
+	`
+
+	rows, err := r.DB.QueryContext(ctx, query, StatusOpen)
+	if err != nil {
+		return nil, fmt.Errorf("list open suits: %w", err)
+	}
+	defer func() {
+		if cerr := rows.Close(); cerr != nil {
+			log.Printf("error closing rows: %v", cerr)
+		}
+	}()
+
+	var result []Suit
+
+	for rows.Next() {
+		var s Suit
+
+		if err := rows.Scan(
+			&s.ID,
+			&s.IncidentID,
+			&s.Status,
+			&s.CreatedAt,
+			&s.ClosedAt,
+			&s.GitHubIssueURL,
+		); err != nil {
+			return nil, err
+		}
+
+		result = append(result, s)
+	}
+
+	return result, nil
 }
 
 // Close marks a Suit as closed.

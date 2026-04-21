@@ -49,7 +49,7 @@ func (o *Service) HandleIncident(
 	logger.Info("handling incident")
 
 	// Persist incident
-	if err := o.Repo.Insert(ctx, r); err != nil {
+	if err := o.IncidentRepo.Insert(ctx, r); err != nil {
 		logger.Error("failed to store incident", zap.Error(err))
 		return err
 	}
@@ -68,7 +68,7 @@ func (o *Service) HandleIncident(
 	}
 
 	if err := o.RDB.XAdd(ctx, &goredis.XAddArgs{
-		Stream: AnalyzedStream,
+		Stream: IncidentCreatedStream,
 		Values: map[string]any{
 			"payload": string(data),
 		},
