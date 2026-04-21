@@ -47,7 +47,6 @@ type PodReconciler struct {
 	Log        logr.Logger
 
 	Service IncidentService
-
 	Cluster string
 
 	// ImageMetaProvider allows resolving OCI image labels
@@ -70,11 +69,23 @@ func (r *PodReconciler) Reconcile(
 		"name", req.Name,
 	)
 
+	// Never act on system-managed "court" namespace
+	if req.Namespace == "court" {
+		logger.Info("skipping reconciliation for protected namespace")
+		return ctrl.Result{}, nil
+	}
+
 	var pod v1.Pod
 
 	// Fetch latest Pod state
 	if err := r.Get(ctx, req.NamespacedName, &pod); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// Extra safety on not acting on "court" namespace
+	if pod.Namespace == "court" {
+		logger.Info("skipping pod in protected namespace after fetch")
+		return ctrl.Result{}, nil
 	}
 
 	// Detect container-level issues
