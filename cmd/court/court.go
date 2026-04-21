@@ -49,6 +49,9 @@ const (
 //   - Consuming "incident.analyzed" events from Redis Streams
 //   - Creating Suit records for validated incidents
 //   - Creating GitHub issues from incident metadata
+//
+// GitHub integration is mandatory:
+//   - GITHUB_TOKEN must be provided, other Court will fail fast if missing
 func newCourtCommand() *cobra.Command {
 
 	var (
@@ -68,10 +71,16 @@ func newCourtCommand() *cobra.Command {
 			// --- Configuration resolution ---
 			// Priority: CLI flags > environment variables > default
 			databaseURL := env.FirstNonEmpty(dsn, env.Get("DATABASE_URL", defaultDSN))
-
 			redisAddress := env.FirstNonEmpty(redisAddr, env.Get("REDIS_ADDR", defaultRedisAddr))
-
 			ghToken := env.FirstNonEmpty(githubToken, env.Get("GITHUB_TOKEN", ""))
+
+			// --- GitHub is mandatory (fail fast) ---
+			if err := env.Require("GITHUB_TOKEN", ghToken); err != nil {
+				logger.Error("missing required configuration", zap.Error(err))
+				return err
+			}
+
+			logger.Info("github integration enabled")
 
 			// --- PostgreSQL initialization ---
 			// Initialize PostgreSQL connection.
@@ -118,12 +127,7 @@ func newCourtCommand() *cobra.Command {
 
 			// --- GitHub client ---
 			// Optional integration used to publish incidents as GitHub issues.
-			var ghClient court.GitHubClient
-
-			if ghToken != "" {
-				logger.Info("github integration enabled")
-				ghClient = github.NewClient(ghToken)
-			}
+			ghClient := github.NewClient(ghToken)
 
 			// --- Court service ---
 			// Court service orchestrates suit creation and external side-effects.
@@ -143,7 +147,7 @@ func newCourtCommand() *cobra.Command {
 	// --- CLI flags ---
 	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
 	cmd.Flags().StringVar(&dsn, "database-url", "", "PostgreSQL DSN")
-	cmd.Flags().StringVar(&githubToken, "github-token", "", "GitHub API token")
+	cmd.Flags().StringVar(&githubToken, "github-token", "", "GitHub API token (required)")
 
 	return cmd
 }
