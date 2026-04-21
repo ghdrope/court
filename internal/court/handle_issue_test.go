@@ -78,13 +78,9 @@ func TestCreateGitHubIssue(t *testing.T) {
 	}
 
 	// Validate title composition
-	if gh.Title != "Court Incident incident-123" {
-		t.Errorf("unexpected title: %s", gh.Title)
-	}
-
-	// Validate title composition
-	if gh.Title != "Court Incident incident-123" {
-		t.Errorf("unexpected title: got %s", gh.Title)
+	expectedTitle := "🚨 api-pod failed (CrashLoopBackOff) — test-cluster/default"
+	if gh.Title != expectedTitle {
+		t.Errorf("unexpected title: got %s, want %s", gh.Title, expectedTitle)
 	}
 
 	// Validate body generation
