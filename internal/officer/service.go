@@ -20,35 +20,46 @@ import (
 	"context"
 
 	"github.com/ghdrope/court/internal/incident"
+	"github.com/ghdrope/court/internal/suit"
 	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
-// Stream configuration for created incidents.
+// IncidentCreatedStream configuration for created incidents.
 const (
-	AnalyzedStream = "incident.created"
+	IncidentCreatedStream = "incident.created"
 )
 
-// IncidentRepository defines the minimal contract required by the service.
+// IncidentRepository defines persistence for incidents.
 type IncidentRepository interface {
 	Insert(ctx context.Context, r *incident.IncidentReport) error
 }
 
-// Service handles incident creation logic.
+// SuitRepository defines persistence for suits.
+type SuitRepository interface {
+	ListOpen(ctx context.Context) ([]suit.Suit, error)
+	Close(ctx context.Context, id string) error
+}
+
+// Service handles incident creation logic and suit lifecycle operations.
 //
-// It is responsible for persisting IncidentReports and emitting
-// upstream events for further processing.
+// Responsibilities:
+//   - Persist IncidentReports
+//   - Emit events to Redis
+//   - Recover open suits after restarts
 type Service struct {
-	Repo IncidentRepository
-	RDB  *goredis.Client
-	Log  *zap.Logger
+	IncidentRepo IncidentRepository
+	SuitRepo     SuitRepository
+	RDB          *goredis.Client
+	Log          *zap.Logger
 }
 
 // New creates a new Officer service.
-func New(repo IncidentRepository, rdb *goredis.Client, logger *zap.Logger) *Service {
+func New(incidentRepo IncidentRepository, suitRepo SuitRepository, rdb *goredis.Client, logger *zap.Logger) *Service {
 	return &Service{
-		Repo: repo,
-		RDB:  rdb,
-		Log:  logger,
+		IncidentRepo: incidentRepo,
+		SuitRepo:     suitRepo,
+		RDB:          rdb,
+		Log:          logger,
 	}
 }

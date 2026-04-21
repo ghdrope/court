@@ -21,6 +21,7 @@ import (
 
 	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/officer"
+	"github.com/ghdrope/court/internal/suit"
 	"github.com/ghdrope/court/pkg/env"
 	"github.com/ghdrope/court/pkg/postgres"
 	"github.com/redis/go-redis/v9"
@@ -113,12 +114,17 @@ func newOfficerCommand() *cobra.Command {
 				return fmt.Errorf("db not ready: %w", err)
 			}
 
-			// Initialize incident repository layer.
-			repo := incident.NewRepository(db)
+			// Initialize repositories.
+			incidentRepo := incident.NewRepository(db)
+			suitRepo := suit.NewRepository(db)
 
-			// Ensure database schema exists before processing workloads.
-			if err := repo.InitSchema(ctx); err != nil {
-				return fmt.Errorf("init schema: %w", err)
+			// Ensure database schema exists.
+			if err := incidentRepo.InitSchema(ctx); err != nil {
+				return fmt.Errorf("init incident schema: %w", err)
+			}
+
+			if err := suitRepo.InitSchema(ctx); err != nil {
+				return fmt.Errorf("init suit schema: %w", err)
 			}
 
 			// --- Redis ---
@@ -129,7 +135,7 @@ func newOfficerCommand() *cobra.Command {
 
 			// --- Service ---
 			// Initialize Officer service.
-			svc := officer.New(repo, rdb, zapLogger)
+			svc := officer.New(incidentRepo, suitRepo, rdb, zapLogger)
 
 			// --- Kubernetes ---
 			// Register Kubernetes API scheme for controller-runtime.
@@ -172,6 +178,18 @@ func newOfficerCommand() *cobra.Command {
 			}
 
 			ctrlLogger.Info("controller registered, starting manager")
+
+			// --- Recovery phase ---
+			// Before starting the controller, we reconcile previously active suits.
+			// This ensures the system is consistent after a crash or restart.
+			//
+			// Recovery rules:
+			//	- If Pod no longer exists -> mark Suit as closed (resolved)
+			//	- If Pod exists and is healthy -> mark Suit as closed (self-healed)
+			//	- If Pod still failing -> keep Suit open
+			if err := svc.RecoverOpenSuits(ctx, clusterName, kubeClient); err != nil {
+				return fmt.Errorf("recovery phase failed: %w", err)
+			}
 
 			// Start controller manager.
 			return mgr.Start(ctx)

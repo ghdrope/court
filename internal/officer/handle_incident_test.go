@@ -26,18 +26,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// fakeRepo is a minimal test double for the IncidentRepository.
-type fakeRepo struct {
-	insertErr error
-	called    bool
-}
-
-// Insert simulates the repository Insert method.
-func (f *fakeRepo) Insert(ctx context.Context, r *incident.IncidentReport) error {
-	f.called = true
-	return f.insertErr
-}
-
 // TestHandleIncident_Success verifies the main execution flow.
 //
 // It ensures that:
@@ -45,7 +33,7 @@ func (f *fakeRepo) Insert(ctx context.Context, r *incident.IncidentReport) error
 //   - the function proceeds to Redis publishing
 //   - an error is returned due to Redis being unreachable
 func TestHandleIncident_Success(t *testing.T) {
-	repo := &fakeRepo{}
+	repo := &fakeIncidentRepo{}
 
 	// Redis client pointing to an invalid address to force failure.
 	rdb := goredis.NewClient(&goredis.Options{
@@ -53,9 +41,10 @@ func TestHandleIncident_Success(t *testing.T) {
 	})
 
 	svc := &Service{
-		Repo: repo,
-		RDB:  rdb,
-		Log:  zap.NewNop(),
+		IncidentRepo: repo,
+		SuitRepo:     &fakeSuitRepo{},
+		RDB:          rdb,
+		Log:          zap.NewNop(),
 	}
 
 	report := &incident.IncidentReport{
@@ -98,13 +87,13 @@ func TestHandleIncident_NilReport(t *testing.T) {
 func TestHandleIncident_InsertFails(t *testing.T) {
 	expectedErr := errors.New("db error")
 
-	repo := &fakeRepo{
+	repo := &fakeIncidentRepo{
 		insertErr: expectedErr,
 	}
 
 	svc := &Service{
-		Repo: repo,
-		Log:  zap.NewNop(),
+		IncidentRepo: repo,
+		Log:          zap.NewNop(),
 	}
 
 	report := &incident.IncidentReport{
@@ -129,7 +118,7 @@ func TestHandleIncident_InsertFails(t *testing.T) {
 //   - Redis publishing fails
 //   - the error is returned to the caller
 func TestHandleIncident_RedisFails(t *testing.T) {
-	repo := &fakeRepo{}
+	repo := &fakeIncidentRepo{}
 
 	// Invalid Redis address to simulate failure.
 	rdb := goredis.NewClient(&goredis.Options{
@@ -137,9 +126,10 @@ func TestHandleIncident_RedisFails(t *testing.T) {
 	})
 
 	svc := &Service{
-		Repo: repo,
-		RDB:  rdb,
-		Log:  zap.NewNop(),
+		IncidentRepo: repo,
+		SuitRepo:     &fakeSuitRepo{},
+		RDB:          rdb,
+		Log:          zap.NewNop(),
 	}
 
 	report := &incident.IncidentReport{

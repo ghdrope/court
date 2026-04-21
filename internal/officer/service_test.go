@@ -19,60 +19,66 @@ package officer
 import (
 	"testing"
 
-	"github.com/ghdrope/court/internal/incident"
 	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
 // TestNew verifies that the Service constructor correctly assigns dependencies.
 func TestNew(t *testing.T) {
+
 	// Arrange
-	repo := &incident.Repository{}
+	incidentRepo := &fakeIncidentRepo{}
+	suitRepo := &fakeSuitRepo{}
+
 	rdb := goredis.NewClient(&goredis.Options{
 		Addr: "localhost:6379",
 	})
+
 	logger := zap.NewNop()
 
-	// Act
-	svc := New(repo, rdb, logger)
+	svc := New(incidentRepo, suitRepo, rdb, logger)
 
 	// Assert
-	if svc == nil {
-		t.Fatal("expected service to be initialized, got nil")
+	if svc.IncidentRepo == nil {
+		t.Errorf("expected IncidentRepo not to be nil")
 	}
 
-	if svc.Repo != repo {
-		t.Errorf("expected Repo to be %v, got %v", repo, svc.Repo)
+	if svc.SuitRepo == nil {
+		t.Errorf("expected SuitRepo not to be nil")
 	}
 
 	if svc.RDB != rdb {
-		t.Errorf("expected RDB to be %v, got %v", rdb, svc.RDB)
+		t.Errorf("expected RDB to match input")
 	}
 
 	if svc.Log != logger {
-		t.Errorf("expected Log to be %v, got %v", logger, svc.Log)
+		t.Errorf("expected Log to match input")
 	}
 }
 
 // TestNew_WithNilDependencies verifies behavior when nil dependencies are provided.
 func TestNew_WithNilDependencies(t *testing.T) {
 	// Act
-	svc := New(nil, nil, nil)
+	svc := New(nil, nil, nil, nil)
 
 	// Assert
 	if svc == nil {
 		t.Fatal("expected service to be initialized even with nil dependencies")
 	}
 
-	if svc.Repo != nil {
-		t.Errorf("expected Repo to be nil, got %v", svc.Repo)
+	if svc.IncidentRepo != nil {
+		t.Errorf("expected IncidentRepo to be nil")
+	}
+
+	if svc.SuitRepo != nil {
+		t.Errorf("expected SuitRepo to be nil")
 	}
 
 	if svc.RDB != nil {
-		t.Errorf("expected RDB to be nil, got %v", svc.RDB)
+		t.Errorf("expected RDB to be nil")
 	}
 
 	if svc.Log != nil {
-		t.Errorf("expected Log to be nil, got %v", svc.Log)
+		t.Errorf("expected Log to be nil")
 	}
 }
