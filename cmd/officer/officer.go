@@ -40,7 +40,6 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-const defaultClusterName = "local-cluster"
 const defaultDsnAddr = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
 const defaultRedisAddr = "localhost:6379"
 
@@ -52,6 +51,9 @@ const defaultRedisAddr = "localhost:6379"
 //   - Building IncidentReports from cluster state
 //   - Persisting incidents into PostgreSQL
 //   - Publishing incident events to Redis for downstream consumers
+//
+// Required configuration:
+//   - CLUSTER_NAME must be set (no default allowed)
 func newOfficerCommand() *cobra.Command {
 
 	var (
@@ -65,14 +67,20 @@ func newOfficerCommand() *cobra.Command {
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 
+			ctx := cmd.Context()
+
 			ctrlLogger := ctrl.Log.WithName("officer")
 			ctrlLogger.Info("starting officer")
 
 			// Resolve config (flag > env > default)
 			clusterName := env.FirstNonEmpty(
 				cluster,
-				env.Get("CLUSTER_NAME", defaultClusterName),
+				env.Get("CLUSTER_NAME", ""),
 			)
+			// Cluster is REQUIRED (no fallback allowed)
+			if err := env.Require("CLUSTER_NAME", clusterName); err != nil {
+				return fmt.Errorf("invalid cluster configuration: %w", err)
+			}
 
 			databaseURL := env.FirstNonEmpty(
 				dsn,
@@ -101,7 +109,7 @@ func newOfficerCommand() *cobra.Command {
 			}()
 
 			// Ensure database readiness before controller startup.
-			if err := postgres.PingWithRetry(cmd.Context(), db); err != nil {
+			if err := postgres.PingWithRetry(ctx, db); err != nil {
 				return fmt.Errorf("db not ready: %w", err)
 			}
 
@@ -109,7 +117,7 @@ func newOfficerCommand() *cobra.Command {
 			repo := incident.NewRepository(db)
 
 			// Ensure database schema exists before processing workloads.
-			if err := repo.InitSchema(cmd.Context()); err != nil {
+			if err := repo.InitSchema(ctx); err != nil {
 				return fmt.Errorf("init schema: %w", err)
 			}
 
@@ -166,13 +174,13 @@ func newOfficerCommand() *cobra.Command {
 			ctrlLogger.Info("controller registered, starting manager")
 
 			// Start controller manager.
-			return mgr.Start(cmd.Context())
+			return mgr.Start(ctx)
 		},
 	}
 
 	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
 	cmd.Flags().StringVar(&dsn, "database-url", "", "PostgreSQL DSN")
-	cmd.Flags().StringVar(&cluster, "cluster", "", "Cluster name")
+	cmd.Flags().StringVar(&cluster, "cluster", "", "Cluster name (required)")
 
 	return cmd
 }
