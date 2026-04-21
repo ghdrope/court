@@ -21,20 +21,43 @@ import (
 	"time"
 )
 
-// Client handles communication with GitHub API.
+// Client implements a GitHub VCS client.
 type Client struct {
 	httpClient *http.Client
 	token      string
 	baseURL    string
 }
 
-// NewClient creates a new GitHub API client.
-func NewClient(token string) *Client {
-	return &Client{
+// Option configures a Client.
+type Option func(*Client)
+
+// WithHTTPClient allows providing a custom HTTP client.
+func WithHTTPClient(hc *http.Client) Option {
+	return func(c *Client) {
+		c.httpClient = hc
+	}
+}
+
+// WithBaseURL overrides the default GitHub API base URL.
+func WithBaseURL(url string) Option {
+	return func(c *Client) {
+		c.baseURL = url
+	}
+}
+
+// NewClient creates a new GitHub client.
+func NewClient(token string, opts ...Option) *Client {
+	c := &Client{
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 		token:   token,
 		baseURL: "https://api.github.com",
 	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c
 }

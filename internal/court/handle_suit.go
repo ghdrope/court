@@ -27,24 +27,25 @@ import (
 	"go.uber.org/zap"
 )
 
-// CreateSuit creates a Suit from an analyzed incident and
-// publishes a GitHub issue.
-func (s *Service) CreateSuit(ctx context.Context, inc *incident.IncidentReport) error {
+// CreateSuit ensures a Suit exists for the given incident.
+func (s *Service) CreateSuit(
+	ctx context.Context,
+	inc *incident.IncidentReport,
+) (*suit.Suit, error) {
 
 	if inc == nil {
-		return fmt.Errorf("incident is nil")
+		return nil, fmt.Errorf("incident is nil")
 	}
 
 	log := s.Log.With(zap.String("incident_id", inc.ID))
 
-	// Check if suit already exists
 	existing, err := s.Repo.GetByIncidentID(ctx, inc.ID)
 	if err == nil && existing != nil {
-		log.Info("suit already exists, skipping creation")
-		return nil
+		log.Info("suit already exists")
+		return existing, nil
 	}
 
-	log.Info("creating suit")
+	log.Info("creating suit for incident")
 
 	newSuit := &suit.Suit{
 		ID:         uuid.NewString(),
@@ -53,29 +54,16 @@ func (s *Service) CreateSuit(ctx context.Context, inc *incident.IncidentReport) 
 		CreatedAt:  time.Now(),
 	}
 
-	// Creating GitHub issue if integration is enabled
-	if s.GitHub != nil {
-
-		if inc.GitHubRepoURL == "" {
-			log.Info("skipping github issue creation: missing repository url")
-		} else {
-			issueURL, err := s.createGitHubIssue(ctx, inc)
-			if err != nil {
-				log.Error("failed to create github issue", zap.Error(err))
-			} else {
-				newSuit.GitHubIssueURL = issueURL
-			}
-		}
-	}
-
 	if err := s.Repo.Insert(ctx, newSuit); err != nil {
-		log.Error("failed to insert suit", zap.Error(err))
-		return err
+		log.Error("failed to create suit",
+			zap.Error(err),
+		)
+		return nil, err
 	}
 
-	log.Info("suit created",
+	log.Info("suit created successfully",
 		zap.String("suit_id", newSuit.ID),
 	)
 
-	return nil
+	return newSuit, nil
 }

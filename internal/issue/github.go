@@ -14,30 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package issue
 
-import (
-	"context"
+// githubCopilotHintSection returns GitHub-specific guidance.
+//
+// This section is only included when the incident is linked to GitHub repositories.
+func githubCopilotHintSection() string {
+	return `
+---
 
-	"github.com/spf13/cobra"
-)
+## 🤖 Copilot Hint
 
-// rootCmd is the base CLI command for the Court.
-var rootCmd = &cobra.Command{
-	Use:   "court",
-	Short: "Court service for case processing",
-	Long:  "Court consumes incidents and manages suits lifecycle",
-	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		_ = cmd.Help()
-	},
-}
+You can use GitHub Copilot Chat to analyze this issue and propose a fix:
 
-// Execute runs the CLI with context propagation.
-func Execute(ctx context.Context) error {
-	return rootCmd.ExecuteContext(ctx)
-}
-
-func init() {
-	rootCmd.AddCommand(newCourtCommand())
+- Ask: *"What is causing this failure?"*
+- Ask: *"Propose a fix based on these logs"*
+- Ask: *"Generate a patch or PR to prevent this crash"*
+`
 }

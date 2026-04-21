@@ -1,19 +1,3 @@
-/*
-Copyright 2026 Pedro Cozinheiro.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package officer
 
 import (
@@ -22,21 +6,30 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
+	"time"
 
 	"github.com/ghdrope/court/internal/incident"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-// DetectContainerIssues analyses the container statuses of a Pod
-// and returns a list of detected issues such as:
-//
-// - CrashLoopBackOff,
-// - ImagePullBackOff
-// - OOMKilled
-func DetectContainerIssues(ctx context.Context, client kubernetes.Interface, pod *v1.Pod) []incident.ContainerIssue {
+const (
+	minPodAge   = 30 * time.Second
+	maxLogBytes = 2 * 1024 * 1024
+)
+
+func DetectContainerIssues(
+	ctx context.Context,
+	client kubernetes.Interface,
+	pod *v1.Pod,
+) []incident.ContainerIssue {
 
 	if pod == nil {
+		return nil
+	}
+
+	if time.Since(pod.CreationTimestamp.Time) < minPodAge {
 		return nil
 	}
 
@@ -44,62 +37,56 @@ func DetectContainerIssues(ctx context.Context, client kubernetes.Interface, pod
 
 	for _, cs := range pod.Status.ContainerStatuses {
 
-		add := func(reason string) {
-
-			issue := incident.ContainerIssue{
+		// TERMINATED FAILURES
+		if cs.State.Terminated != nil && cs.State.Terminated.ExitCode != 0 {
+			issues = append(issues, incident.ContainerIssue{
 				Container: cs.Name,
 				ImageName: cs.Image,
-				Reason:    reason,
-			}
-
-			// Only fetch logs if issue is meaningful
-			// (avoid overhead for healthy containers)
-			logs := fetchContainerLogs(
-				ctx,
-				client,
-				pod.Namespace,
-				pod.Name,
-				cs.Name,
-			)
-
-			if len(logs) == 0 {
-				issue.Logs = []string{"<no logs available>"}
-			} else {
-				issue.Logs = logs
-			}
-
-			issues = append(issues, issue)
-		}
-
-		// Detect containers stuck in waiting states due to runtime issues.
-		if cs.State.Terminated != nil {
-
-			if cs.State.Terminated.ExitCode != 0 {
-				reason := fmt.Sprintf(
-					"%s (exit=%d)",
+				Reason: fmt.Sprintf(
+					"terminated (%s exit=%d)",
 					cs.State.Terminated.Reason,
 					cs.State.Terminated.ExitCode,
-				)
-				add(reason)
-			}
-
+				),
+			})
 			continue
 		}
 
+		// WAITING FAILURES
 		if cs.State.Waiting != nil {
-
 			switch cs.State.Waiting.Reason {
-
-			case "CrashLoopBackOff",
-				"ImagePullBackOff",
-				"ErrImagePull",
-				"RunContainerError":
-
-				add(cs.State.Waiting.Reason)
-
-			default:
-				continue
+			case "CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "RunContainerError":
+				issues = append(issues, incident.ContainerIssue{
+					Container: cs.Name,
+					ImageName: cs.Image,
+					Reason:    cs.State.Waiting.Reason,
+				})
 			}
+		}
+	}
+
+	return issues
+}
+
+func EnrichContainerIssuesWithLogs(
+	ctx context.Context,
+	client kubernetes.Interface,
+	pod *v1.Pod,
+	issues []incident.ContainerIssue,
+) []incident.ContainerIssue {
+
+	for i := range issues {
+
+		container := issues[i].Container
+		if container == "" {
+			container = firstContainer(pod)
+		}
+
+		logs := fetchContainerLogs(ctx, client, pod.Namespace, pod.Name, container)
+
+		if len(logs) == 0 {
+			issues[i].Logs = []string{"<no logs available>"}
+		} else {
+			issues[i].Logs = logs
 		}
 	}
 
@@ -109,19 +96,15 @@ func DetectContainerIssues(ctx context.Context, client kubernetes.Interface, pod
 func fetchContainerLogs(
 	ctx context.Context,
 	client kubernetes.Interface,
-	namespace string,
-	podName string,
-	container string,
+	namespace, podName, container string,
 ) []string {
 
-	// Never fetch logs from protected system namespace
 	if namespace == "court" {
-		return []string{"<access blocked: protected namespace>"}
+		return []string{"<blocked system namespace>"}
 	}
 
-	const maxLines = 150
-
 	readLogs := func(previous bool) []string {
+
 		req := client.CoreV1().
 			Pods(namespace).
 			GetLogs(podName, &v1.PodLogOptions{
@@ -131,46 +114,47 @@ func fetchContainerLogs(
 
 		stream, err := req.Stream(ctx)
 		if err != nil {
-			return nil
+			return []string{fmt.Sprintf("<log error: %v>", err)}
 		}
 		defer func() {
-			_ = stream.Close()
+			if err := stream.Close(); err != nil {
+				log.Printf("failed to close stream: %v", err)
+			}
 		}()
 
-		var buffer bytes.Buffer
-		_, _ = io.Copy(&buffer, stream)
+		limited := io.LimitReader(stream, maxLogBytes)
 
-		scanner := bufio.NewScanner(&buffer)
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, limited)
+
+		scanner := bufio.NewScanner(&buf)
 
 		var lines []string
 		for scanner.Scan() {
 			lines = append(lines, scanner.Text())
 		}
 
-		if len(lines) > maxLines {
-			return lines[len(lines)-maxLines:]
-		}
-
 		return lines
 	}
 
-	// 1. current logs
 	current := readLogs(false)
-
-	// 2. previous logs (crucial for crashes)
 	previous := readLogs(true)
 
-	// merge with separator
 	if len(previous) == 0 {
 		return current
 	}
 
 	out := make([]string, 0, len(previous)+len(current)+2)
 
-	out = append(out, "--- PREVIOUS CONTAINER LOGS ---")
-	out = append(out, previous...)
-	out = append(out, "--- CURRENT CONTAINER LOGS ---")
-	out = append(out, current...)
+	if len(previous) > 0 {
+		out = append(out, "--- previous logs ---")
+		out = append(out, previous...)
+	}
+
+	if len(current) > 0 {
+		out = append(out, "--- current logs ---")
+		out = append(out, current...)
+	}
 
 	return out
 }

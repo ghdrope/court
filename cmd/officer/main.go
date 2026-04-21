@@ -25,7 +25,12 @@ import (
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-// main initializes logging, signal handling, and executes the CLI.
+// main is the process entrypoint.
+//
+// It initializes structured logging, installs signal handlers for graceful
+// shutdown (SIGINT/SIGTERM), and executes the CLI root command.
+//
+// Any fatal error during execution results in a non-zero exit code.
 func main() {
 	ctx := signals.SetupSignalHandler()
 
@@ -37,14 +42,16 @@ func main() {
 		_ = logger.Sync()
 	}()
 
-	// Global logger
+	// Replace global zap logger
 	zap.ReplaceGlobals(logger)
 
-	// controller-runtime logger
+	// Configure controller-runtime logger
 	ctrl.SetLogger(ctrlzap.New(ctrlzap.UseDevMode(false)))
 
 	if err := Execute(ctx); err != nil {
 		zap.L().Error("fatal error", zap.Error(err))
 		os.Exit(1)
 	}
+
+	zap.L().Info("shutdown complete")
 }

@@ -22,18 +22,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd is the base CLI command for the Officer.
+// rootCmd is the base CLI command for the Officer binary.
 var rootCmd = &cobra.Command{
 	Use:   "officer",
 	Short: "Court Officer CLI",
 	Long:  "Officer monitors Kubernetes workloads and reports incidents.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.HelpFunc()(cmd, args)
+		_ = cmd.HelpFunc()
 	},
 }
 
-// Execute runs the CLI with context propagation.
+// Execute runs the CLI using the provided context.
+//
+// The context is propagated to all subcommands, enabling
+// graceful shutdown of long-running components.
 func Execute(ctx context.Context) error {
 	return rootCmd.ExecuteContext(ctx)
 }

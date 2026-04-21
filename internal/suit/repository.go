@@ -26,15 +26,15 @@ import (
 
 // Repository handles persistence of Suit entities.
 type Repository struct {
-	DB *sql.DB
+	db *sql.DB
 }
 
 // NewRepository creates a new Suit repository.
 func NewRepository(db *sql.DB) *Repository {
-	return &Repository{DB: db}
+	return &Repository{db: db}
 }
 
-// InitSchema ensures suits table exists.
+// InitSchema ensures that the required database schema exists.
 func (r *Repository) InitSchema(ctx context.Context) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS suits (
@@ -50,15 +50,15 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 	ON suits (incident_id);
 	`
 
-	_, err := r.DB.ExecContext(ctx, query)
-	if err != nil {
-		return fmt.Errorf("init schema: %w", err)
+	if _, err := r.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("init suit schema: %w", err)
 	}
 
 	return nil
 }
 
 // Insert creates a new Suit.
+// If a suit already exists for the same incident, it is ignored.
 func (r *Repository) Insert(ctx context.Context, s *Suit) error {
 	if s == nil {
 		return fmt.Errorf("suit is nil")
@@ -77,7 +77,7 @@ func (r *Repository) Insert(ctx context.Context, s *Suit) error {
 	ON CONFLICT (incident_id) DO NOTHING
 	`
 
-	_, err := r.DB.ExecContext(
+	_, err := r.db.ExecContext(
 		ctx,
 		query,
 		s.ID,
@@ -85,7 +85,7 @@ func (r *Repository) Insert(ctx context.Context, s *Suit) error {
 		s.Status,
 		s.CreatedAt,
 		s.ClosedAt,
-		s.GitHubIssueURL,
+		s.VCSIssueURL,
 	)
 
 	if err != nil {
@@ -95,7 +95,29 @@ func (r *Repository) Insert(ctx context.Context, s *Suit) error {
 	return nil
 }
 
-// GetByIncidentID retrieves a Suit by its incident reference.
+// UpdateVCSInfo updates external VCS metadata for a Suit.
+//
+// This is typically called after creating an external issue
+// and storing its URL.
+func (r *Repository) UpdateVCSInfo(ctx context.Context, s *Suit) error {
+	if s == nil {
+		return fmt.Errorf("suit is nil")
+	}
+
+	query := `
+	UPDATE suits
+	SET github_issue_url = $1
+	WHERE id = $2
+	`
+
+	if _, err := r.db.ExecContext(ctx, query, s.VCSIssueURL, s.ID); err != nil {
+		return fmt.Errorf("update vcs info: %w", err)
+	}
+
+	return nil
+}
+
+// GetByIncidentID retrieves a Suit by its incident ID.
 func (r *Repository) GetByIncidentID(ctx context.Context, incidentID string) (*Suit, error) {
 	query := `
 	SELECT id, incident_id, status, created_at, closed_at, github_issue_url
@@ -105,26 +127,26 @@ func (r *Repository) GetByIncidentID(ctx context.Context, incidentID string) (*S
 
 	var s Suit
 
-	err := r.DB.QueryRowContext(ctx, query, incidentID).Scan(
+	err := r.db.QueryRowContext(ctx, query, incidentID).Scan(
 		&s.ID,
 		&s.IncidentID,
 		&s.Status,
 		&s.CreatedAt,
 		&s.ClosedAt,
-		&s.GitHubIssueURL,
+		&s.VCSIssueURL,
 	)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("query suit: %w", err)
+		return nil, fmt.Errorf("get suit by incident id: %w", err)
 	}
 
 	return &s, nil
 }
 
-// ListOpen returns all open suits.
+// ListOpen returns all suits that are currently open.
 func (r *Repository) ListOpen(ctx context.Context) ([]Suit, error) {
 	query := `
 	SELECT id, incident_id, status, created_at, closed_at, github_issue_url
@@ -132,7 +154,7 @@ func (r *Repository) ListOpen(ctx context.Context) ([]Suit, error) {
 	WHERE status = $1
 	`
 
-	rows, err := r.DB.QueryContext(ctx, query, StatusOpen)
+	rows, err := r.db.QueryContext(ctx, query, StatusOpen)
 	if err != nil {
 		return nil, fmt.Errorf("list open suits: %w", err)
 	}
@@ -153,12 +175,16 @@ func (r *Repository) ListOpen(ctx context.Context) ([]Suit, error) {
 			&s.Status,
 			&s.CreatedAt,
 			&s.ClosedAt,
-			&s.GitHubIssueURL,
+			&s.VCSIssueURL,
 		); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan suit row: %w", err)
 		}
 
 		result = append(result, s)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate suit rows: %w", err)
 	}
 
 	return result, nil
@@ -175,8 +201,7 @@ func (r *Repository) Close(ctx context.Context, id string) error {
 	WHERE id = $3
 	`
 
-	_, err := r.DB.ExecContext(ctx, query, StatusClosed, now, id)
-	if err != nil {
+	if _, err := r.db.ExecContext(ctx, query, StatusClosed, now, id); err != nil {
 		return fmt.Errorf("close suit: %w", err)
 	}
 

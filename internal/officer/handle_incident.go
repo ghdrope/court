@@ -23,14 +23,10 @@ import (
 
 	"github.com/ghdrope/court/internal/incident"
 	goredis "github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
 )
 
-// HandleIncident persists the incident and emits an event.
-//
-// It ensures the incident is stored before publishing the event.
-// This operation should be idempotent at the database level.
-func (o *Service) HandleIncident(
+// HandleIncident stores the incident and emits an event.
+func (s *Service) HandleIncident(
 	ctx context.Context,
 	r *incident.IncidentReport,
 ) error {
@@ -39,22 +35,20 @@ func (o *Service) HandleIncident(
 		return fmt.Errorf("incident is nil")
 	}
 
-	logger := o.Log.With(
-		zap.String("incident_id", r.ID),
-		zap.String("cluster", r.Cluster),
-		zap.String("namespace", r.Namespace),
-		zap.String("pod", r.Pod),
+	logger := s.Log.WithValues(
+		"incident_id", r.ID,
+		"pod", r.Pod,
+		"namespace", r.Namespace,
 	)
 
-	logger.Info("handling incident")
+	logger.Info("incident detected")
 
-	// Persist incident
-	if err := o.IncidentRepo.Insert(ctx, r); err != nil {
-		logger.Error("failed to store incident", zap.Error(err))
+	if err := s.IncidentRepo.Insert(ctx, r); err != nil {
+		logger.Error(err, "failed to store incident")
 		return err
 	}
 
-	logger.Info("incident stored in archive")
+	logger.Info("incident stored")
 
 	// Emit event with only the ID
 	payload := map[string]any{
@@ -63,21 +57,23 @@ func (o *Service) HandleIncident(
 
 	data, err := json.Marshal(payload)
 	if err != nil {
-		logger.Error("failed to marshal event payload", zap.Error(err))
+		logger.Error(err, "failed to encode event payload")
 		return err
 	}
 
-	if err := o.RDB.XAdd(ctx, &goredis.XAddArgs{
+	err = s.RDB.XAdd(ctx, &goredis.XAddArgs{
 		Stream: IncidentCreatedStream,
 		Values: map[string]any{
 			"payload": string(data),
 		},
-	}).Err(); err != nil {
-		logger.Error("failed to publish event", zap.Error(err))
+	}).Err()
+
+	if err != nil {
+		logger.Error(err, "failed to publish event")
 		return err
 	}
 
-	logger.Info("incident.created event published")
+	logger.Info("incident event published")
 
 	return nil
 }

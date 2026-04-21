@@ -22,11 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// BuildFromPod constructs an IncidentReport from a Kubernetes Pod and
-// pre-evaluated container issues.
+// BuildFromPod constructs an IncidentReport from a K8s Pod.
 //
-// This function acts as a translation layer between Kubernetes
-// runtime state and the IncidentReport model.
+// It acts as a translation layer between K8s runtime state
+// and the domain IncidentReport model.
 func BuildFromPod(
 	pod *v1.Pod,
 	cluster string,
@@ -40,15 +39,14 @@ func BuildFromPod(
 	}
 
 	return IncidentReport{
-		//Use namespace/name + UID to guarantee uniqueness across time
+		// ID is derived from namespace/name/UID to guarantee uniqueness over time.
 		ID: fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, pod.UID),
 
-		// Target workload identity
 		Cluster:   cluster,
 		Namespace: pod.Namespace,
 		Pod:       pod.Name,
 
-		GitHubRepoURL: repoURL,
+		VCSRepoURL: repoURL,
 
 		// Core evidence
 		Events: events,
