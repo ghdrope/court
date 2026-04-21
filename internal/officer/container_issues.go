@@ -114,6 +114,11 @@ func fetchContainerLogs(
 	container string,
 ) []string {
 
+	// Never fetch logs from protected system namespace
+	if namespace == "court" {
+		return []string{"<access blocked: protected namespace>"}
+	}
+
 	const maxLines = 150
 
 	readLogs := func(previous bool) []string {
