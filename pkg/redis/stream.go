@@ -19,16 +19,27 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	goredis "github.com/redis/go-redis/v9"
 )
+
+// redisClient defines the minimal Redis operations required by StreamClient.
+//
+// It allows decoupling from the concrete *goredis.Client type,
+// enabling easier testing via mocks or fakes.
+type redisClient interface {
+	XGroupCreateMkStream(ctx context.Context, stream, group, start string) *goredis.StatusCmd
+	XReadGroup(ctx context.Context, args *goredis.XReadGroupArgs) *goredis.XStreamSliceCmd
+	XAck(ctx context.Context, stream, group string, ids ...string) *goredis.IntCmd
+}
 
 // StreamClient provides access to Redis Streams operations.
 //
 // It is responsible for stream-level operations such as
 // consumer group creation and message consumption.
 type StreamClient struct {
-	rdb *goredis.Client
+	rdb redisClient
 	cfg Config
 }
 
@@ -62,5 +73,5 @@ func (c *StreamClient) EnsureGroup(ctx context.Context) error {
 //
 // This happens when the consumer group already exists.
 func isBusyGroupError(err error) bool {
-	return err != nil && goredis.HasErrorPrefix(err, "BUSYGROUP")
+	return err != nil && strings.HasPrefix(err.Error(), "BUSYGROUP")
 }
