@@ -1,19 +1,3 @@
-/*
-Copyright 2026 Pedro Cozinheiro.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package issue
 
 import (
@@ -24,60 +8,75 @@ import (
 )
 
 // buildBody generates a detailed Markdown report for the VCS issue.
-//
-// The output is designed for:
-//   - human debugging
-//   - Copilot / LLM-assisted diagnosis
-//   - structured incident analysis
 func buildBody(inc *incident.IncidentReport) string {
+	if inc == nil {
+		return "## 🚨 Incident report is nil"
+	}
 
-	// --- Events section ---
-	var warnings []string
+	// -------------------------
+	// EVENTS
+	// -------------------------
 	var normalEvents []string
+	var warningEvents []string
 
 	for _, e := range inc.Events {
-
-		line := fmt.Sprintf(
-			"- [%s] %s: %s",
-			e.Type,
-			e.Reason,
-			e.Message,
-		)
+		line := fmt.Sprintf("- [%s] %s: %s", e.Type, e.Reason, e.Message)
 
 		if strings.EqualFold(e.Type, "warning") {
-			warnings = append(warnings, line)
+			warningEvents = append(warningEvents, line)
 		} else {
 			normalEvents = append(normalEvents, line)
 		}
 	}
 
-	eventsSection := joinSections(
-		renderSection("Warnings", warnings),
-		renderSection("Events", normalEvents),
-	)
+	eventsSection := "No events available"
 
-	// --- Container diagnostics ---
-	var containers []string
+	if len(warningEvents) > 0 || len(normalEvents) > 0 {
+		var b strings.Builder
 
-	for _, c := range inc.ContainerIssues {
+		if len(warningEvents) > 0 {
+			b.WriteString("### Warnings\n```\n")
+			b.WriteString(strings.Join(warningEvents, "\n"))
+			b.WriteString("\n```\n\n")
+		}
 
-		logs := formatLogs(c.Logs)
+		if len(normalEvents) > 0 {
+			b.WriteString("### Events\n```\n")
+			b.WriteString(strings.Join(normalEvents, "\n"))
+			b.WriteString("\n```")
+		}
 
-		entry := fmt.Sprintf(
-			"### Container `%s`\n"+
-				"- Image: `%s`\n"+
-				"- Failure Reason: `%s`\n\n"+
-				"#### Logs\n"+
-				"```\n%s\n```",
-			c.Container,
-			c.ImageName,
-			c.Reason,
-			logs,
-		)
-
-		containers = append(containers, entry)
+		eventsSection = b.String()
 	}
 
+	// -------------------------
+	// CONTAINERS
+	// -------------------------
+	var containers []string
+
+	if len(inc.ContainerIssues) == 0 {
+		containers = append(containers, "_No container issues detected_")
+	} else {
+		for _, c := range inc.ContainerIssues {
+			logs := formatLogs(c.Logs)
+
+			entry := fmt.Sprintf(
+				"### Container `%s`\n"+
+					"- Image: `%s`\n"+
+					"#### Logs\n"+
+					"```\n%s\n```",
+				c.Container,
+				c.ImageName,
+				logs,
+			)
+
+			containers = append(containers, entry)
+		}
+	}
+
+	// -------------------------
+	// BODY
+	// -------------------------
 	body := fmt.Sprintf(`
 ## 🚨 Automated Incident Report
 
@@ -94,9 +93,9 @@ This issue contains diagnostic data to help identify root cause and guide remedi
 
 ## 🧭 Environment
 
-- **Cluster:** %s
-- **Namespace:** %s
-- **Pod:** %s
+- Cluster: %s
+- Namespace: %s
+- Pod: %s
 
 ---
 
@@ -114,7 +113,6 @@ This issue contains diagnostic data to help identify root cause and guide remedi
 
 ## 🧩 Potential Root Cause Signals
 
-- Primary failure signal: %s
 - Likely causes: crash loops, misconfiguration, missing dependencies, resource exhaustion
 
 ---
@@ -135,17 +133,11 @@ Please review the following:
 		inc.Pod,
 		eventsSection,
 		strings.Join(containers, "\n\n"),
-		extractPrimaryReason(inc),
 	)
 
 	body += vcsSectionFor(inc)
 
-	body += `
-
----
-
-_This issue was generated automatically by [Court](https://github.com/ghdrope/court)._
-`
+	body += "\n---\n_This issue was generated automatically by [Court](https://github.com/ghdrope/court)._\n"
 
 	return body
 }

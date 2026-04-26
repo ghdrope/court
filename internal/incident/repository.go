@@ -166,5 +166,17 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 		return nil, fmt.Errorf("query incident: %w", err)
 	}
 
+	if len(eventsJSON) > 0 {
+		if err := json.Unmarshal(eventsJSON, &inc.Events); err != nil {
+			return nil, fmt.Errorf("unmarshal events: %w", err)
+		}
+	}
+
+	if len(issuesJSON) > 0 {
+		if err := json.Unmarshal(issuesJSON, &inc.ContainerIssues); err != nil {
+			return nil, fmt.Errorf("unmarshal container issues: %w", err)
+		}
+	}
+
 	return &inc, nil
 }
