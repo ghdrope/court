@@ -13,7 +13,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
 package court
 
 import (
@@ -28,6 +27,8 @@ import (
 )
 
 // CreateSuit ensures a Suit exists for the given incident.
+//
+// If a Suit already exists, it is returned without modification.
 func (s *Service) CreateSuit(
 	ctx context.Context,
 	inc *incident.IncidentReport,
@@ -45,7 +46,7 @@ func (s *Service) CreateSuit(
 		return existing, nil
 	}
 
-	log.Info("creating suit for incident")
+	log.Info("creating suit")
 
 	newSuit := &suit.Suit{
 		ID:         uuid.NewString(),
@@ -55,13 +56,11 @@ func (s *Service) CreateSuit(
 	}
 
 	if err := s.Repo.Insert(ctx, newSuit); err != nil {
-		log.Error("failed to create suit",
-			zap.Error(err),
-		)
+		log.Error("failed to create suit", zap.Error(err))
 		return nil, err
 	}
 
-	log.Info("suit created successfully",
+	log.Info("suit created",
 		zap.String("suit_id", newSuit.ID),
 	)
 

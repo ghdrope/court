@@ -48,13 +48,12 @@ func (s *Service) CreateIssue(
 
 	owner, repo, err := parseRepo(inc.VCSRepoURL)
 	if err != nil {
-		log.Error("invalid repo url", zap.Error(err), zap.String("url", inc.VCSRepoURL))
+		log.Error("invalid repo url",
+			zap.Error(err),
+			zap.String("url", inc.VCSRepoURL),
+		)
 		return err
 	}
-
-	log.Info("creating VCS issue",
-		zap.String("repo", owner+"/"+repo),
-	)
 
 	result, err := s.VCS.CreateIssue(
 		ctx,
@@ -66,7 +65,6 @@ func (s *Service) CreateIssue(
 	if err != nil {
 		log.Error("failed to create VCS issue",
 			zap.Error(err),
-			zap.String("repo", owner+"/"+repo),
 		)
 		return err
 	}
@@ -80,7 +78,9 @@ func (s *Service) CreateIssue(
 	return nil
 }
 
-// parseRepo extracts owner/repo from Git URL.
+// parseRepo extracts owner/repo from a Git URL.
+//
+// Supports standard HTTPS GitHub URLs.
 func parseRepo(raw string) (string, string, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
@@ -95,9 +95,9 @@ func parseRepo(raw string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-// CloseIssue is reserved for future VCS integration.
+// CloseIssue closes a VCS issue and updates Suit state.
 //
-// TODO: implement issue closing / lifecycle sync across providers.
+// Future: extend to support multiple VCS providers.
 func (s *Service) CloseIssue(
 	ctx context.Context,
 	suitEntity *suit.Suit,
@@ -112,7 +112,7 @@ func (s *Service) CloseIssue(
 	}
 
 	if suitEntity.VCSIssueURL == "" {
-		return fmt.Errorf("no VCS issue linked to suit")
+		return fmt.Errorf("no VCS issue linked")
 	}
 
 	log := s.Log.With(
@@ -128,12 +128,11 @@ func (s *Service) CloseIssue(
 		return err
 	}
 
-	// update domain state
 	now := time.Now()
 	suitEntity.Status = suit.StatusClosed
 	suitEntity.ClosedAt = &now
 
-	log.Info("VCS issue closed successfully")
+	log.Info("VCS issue closed")
 
 	return nil
 }
