@@ -17,37 +17,8 @@ limitations under the License.
 package issue
 
 import (
-	"fmt"
 	"strings"
-
-	"github.com/ghdrope/court/internal/incident"
 )
-
-// renderSection formats a section with a title and items.
-func renderSection(title string, items []string) string {
-	if len(items) == 0 {
-		return ""
-	}
-
-	return fmt.Sprintf("### %s\n%s", title, strings.Join(items, "\n"))
-}
-
-// joinSections merges multiple sections safely.
-func joinSections(sections ...string) string {
-	var out []string
-
-	for _, s := range sections {
-		if strings.TrimSpace(s) != "" {
-			out = append(out, s)
-		}
-	}
-
-	if len(out) == 0 {
-		return "_No events available_"
-	}
-
-	return strings.Join(out, "\n\n")
-}
 
 // formatLogs ensures logs are safe for markdown rendering.
 func formatLogs(logs []string) string {
@@ -56,14 +27,4 @@ func formatLogs(logs []string) string {
 	}
 
 	return strings.Join(logs, "\n")
-}
-
-// extractPrimaryReason returns the most relevant failure reason.
-func extractPrimaryReason(inc *incident.IncidentReport) string {
-	if len(inc.ContainerIssues) > 0 {
-		if inc.ContainerIssues[0].Reason != "" {
-			return inc.ContainerIssues[0].Reason
-		}
-	}
-	return "unknown"
 }

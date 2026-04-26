@@ -29,10 +29,9 @@ import (
 //   - identifying workload, cluster, and failure reason
 func buildTitle(inc *incident.IncidentReport) string {
 	return fmt.Sprintf(
-		"🚨 %s failed — %s/%s (%s)",
+		"🚨 %s failed — %s/%s",
 		inc.Pod,
 		inc.Cluster,
 		inc.Namespace,
-		extractPrimaryReason(inc),
 	)
 }
