@@ -60,7 +60,8 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 	ON incidents (namespace, pod);
 	`
 
-	if _, err := r.db.ExecContext(ctx, query); err != nil {
+	_, err := r.db.ExecContext(ctx, query)
+	if err != nil {
 		return fmt.Errorf("init incident schema: %w", err)
 	}
 
@@ -68,19 +69,19 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 }
 
 // Insert creates or updates an IncidentReport.
-func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
+func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) (bool, error) {
 	if inc == nil {
-		return fmt.Errorf("incident is nil")
+		return false, fmt.Errorf("incident is nil")
 	}
 
 	eventsJSON, err := json.Marshal(inc.Events)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	issuesJSON, err := json.Marshal(inc.ContainerIssues)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	query := `
@@ -102,9 +103,12 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
 		events = EXCLUDED.events,
 		container_issues = EXCLUDED.container_issues,
 		updated_at = NOW()
+	RETURNING (xmax = 0) AS inserted
 	`
 
-	if _, err = r.db.ExecContext(
+	var created bool
+
+	err = r.db.QueryRowContext(
 		ctx,
 		query,
 		inc.ID,
@@ -114,11 +118,13 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
 		inc.VCSRepoURL,
 		eventsJSON,
 		issuesJSON,
-	); err != nil {
-		return fmt.Errorf("insert incident: %w", err)
+	).Scan(&created)
+
+	if err != nil {
+		return false, fmt.Errorf("insert incident: %w", err)
 	}
 
-	return nil
+	return created, nil
 }
 
 // GetByID retrieves an IncidentReport by ID.

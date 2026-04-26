@@ -33,7 +33,7 @@ const (
 
 // IncidentRepository defines persistence for incidents.
 type IncidentRepository interface {
-	Insert(ctx context.Context, r *incident.IncidentReport) error
+	Insert(ctx context.Context, r *incident.IncidentReport) (bool, error)
 }
 
 // SuitRepository defines persistence for suits.
