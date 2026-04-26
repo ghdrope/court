@@ -16,9 +16,8 @@ limitations under the License.
 
 package issue
 
-// githubCopilotHintSection returns GitHub-specific guidance.
-//
-// This section is only included when the incident is linked to GitHub repositories.
+// githubCopilotHintSection returns GitHub-specific guidance
+// included when incident is linked to GitHub repositories.
 func githubCopilotHintSection() string {
 	return `
 ---

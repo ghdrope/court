@@ -22,9 +22,12 @@ import (
 	"github.com/ghdrope/court/internal/incident"
 )
 
-// vcsSectionFor returns provider-specific Markdown sections
-// based on the repository host contained in the URL.
+// vcsSectionFor returns provider-specific Markdown sections.
 func vcsSectionFor(inc *incident.IncidentReport) string {
+	if inc == nil {
+		return ""
+	}
+
 	repoURL := strings.ToLower(inc.VCSRepoURL)
 
 	switch {

@@ -17,23 +17,25 @@ limitations under the License.
 package issue
 
 import (
-	"fmt"
+	"testing"
 
-	"github.com/ghdrope/court/internal/incident"
+	"github.com/ghdrope/court/internal/testhelper"
 )
 
-// buildTitle generates a human-readable issue title.
-//
-// The title is optimized for quick scanning in VCS issue lists.
-func buildTitle(inc *incident.IncidentReport) string {
-	if inc == nil {
-		return "🚨 nil incident report"
+// TestBuildFromIncidentReport ensures an IncidentReport is correctly
+// transformed into a VCS issue with title and body populated.
+func TestBuildFromIncidentReport(t *testing.T) {
+	t.Parallel()
+
+	inc := testhelper.NewIncidentReport()
+
+	issue := BuildFromIncidentReport(inc)
+
+	if issue.Title == "" {
+		t.Fatalf("expected title to be set")
 	}
 
-	return fmt.Sprintf(
-		"🚨 %s failed — %s/%s",
-		inc.Pod,
-		inc.Cluster,
-		inc.Namespace,
-	)
+	if issue.Body == "" {
+		t.Fatalf("expected body to be set")
+	}
 }

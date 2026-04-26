@@ -16,24 +16,31 @@ limitations under the License.
 
 package issue
 
-import (
-	"fmt"
+import "testing"
 
-	"github.com/ghdrope/court/internal/incident"
-)
+// TestFormatLogs_Empty ensures empty logs return fallback message.
+func TestFormatLogs_Empty(t *testing.T) {
+	t.Parallel()
 
-// buildTitle generates a human-readable issue title.
-//
-// The title is optimized for quick scanning in VCS issue lists.
-func buildTitle(inc *incident.IncidentReport) string {
-	if inc == nil {
-		return "🚨 nil incident report"
+	got := formatLogs([]string{})
+
+	if got != "<no logs available>" {
+		t.Errorf("unexpected output for empty logs: %s", got)
+	}
+}
+
+// TestFormatLogs_Content ensures logs are joined correctly.
+func TestFormatLogs_Content(t *testing.T) {
+	t.Parallel()
+
+	logs := []string{
+		"line1",
+		"line2",
 	}
 
-	return fmt.Sprintf(
-		"🚨 %s failed — %s/%s",
-		inc.Pod,
-		inc.Cluster,
-		inc.Namespace,
-	)
+	got := formatLogs(logs)
+
+	if got != "line1\nline2" {
+		t.Errorf("unexpected formatted logs: %s", got)
+	}
 }
