@@ -23,10 +23,13 @@ import (
 
 // EvaluateSuitClosure determines whether a suit should be closed.
 //
-// This is a no-side effects function shared by both recovery and controller.
+// It is a pure function with no side effects and is used by both:
 //
-// expectedUID:
-//   - recovery: UID from stored incident
+//   - recovery reconciliation process
+//   - controller reconciliation loop
+//
+// expectedUID semantics:
+//   - recovery: UID stored in the incident state
 //   - controller: empty string (not applicable)
 func EvaluateSuitClosure(
 	pod *v1.Pod,
@@ -34,17 +37,17 @@ func EvaluateSuitClosure(
 	containersMetadata []incident.ContainerMetadata,
 ) (bool, string) {
 
-	// Pod no longer exists in cluster
+	// Pod is no longer present in the cluster
 	if pod == nil {
 		return true, "pod_deleted"
 	}
 
-	// Pod was recreated (new UID)
+	// Pod was recreated (UID mismatch with expected state)
 	if expectedUID != "" && string(pod.UID) != expectedUID {
 		return true, "pod_recreated"
 	}
 
-	// Pod recovery condition
+	// Pod has recovered based on container state
 	if isPodResolved(pod, containersMetadata) {
 		return true, "pod_resolved"
 	}

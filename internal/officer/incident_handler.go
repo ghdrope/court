@@ -25,7 +25,13 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
-// HandleIncident stores the incident and emits an event.
+// HandleIncident persists an incident and emits a creation event.
+//
+// Behavior:
+//   - Inserts or updates the incident in the repository
+//   - Emits an event only when the incident is newly created
+//
+// This ensures idempotency and avoids duplicate event emission.
 func (s *Service) HandleIncident(
 	ctx context.Context,
 	r *incident.IncidentReport,
@@ -55,18 +61,23 @@ func (s *Service) HandleIncident(
 		logger.Info("incident updated")
 	}
 
+	// Emit event only for new incidents
 	if !created {
 		return nil
 	}
 
-	// Emit event with only the ID
+	if s.RDB == nil {
+		logger.Info("redis client is nil, skipping event emission")
+		return nil
+	}
+
 	payload := map[string]any{
 		"incident_id": r.ID,
 	}
 
 	data, err := json.Marshal(payload)
 	if err != nil {
-		logger.Error(err, "failed to encode event payload")
+		logger.Error(err, "failed to encode incident event payload")
 		return err
 	}
 
@@ -78,7 +89,7 @@ func (s *Service) HandleIncident(
 	}).Err()
 
 	if err != nil {
-		logger.Error(err, "failed to publish event")
+		logger.Error(err, "failed to publish incident event")
 		return err
 	}
 

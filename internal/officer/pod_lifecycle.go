@@ -25,7 +25,7 @@ import (
 
 // isPodHealthy checks whether a pod is Running and Ready.
 //
-// It does NOT guarantee absence of issues, only basic health.
+// This indicates basic readiness, not absence of issues.
 func isPodHealthy(pod *v1.Pod) bool {
 	if pod == nil {
 		return false
@@ -44,13 +44,14 @@ func isPodHealthy(pod *v1.Pod) bool {
 	return false
 }
 
+// shouldIgnorePod determines whether a Pod should be skipped during reconciliation.
+//
+// Pods in very early startup (Pending for a short time) are ignored
+// to avoid false positives during scheduling and initialization.
 func shouldIgnorePod(pod *v1.Pod) bool {
 	if pod == nil {
 		return true
 	}
-
-	// NÃO ignorar apenas por idade
-	// só ignorar realmente pods que ainda não existem logicamente
 
 	if pod.Status.Phase == v1.PodPending &&
 		time.Since(pod.CreationTimestamp.Time) < 5*time.Second {
@@ -60,6 +61,13 @@ func shouldIgnorePod(pod *v1.Pod) bool {
 	return false
 }
 
+// isPodFailing determines whether a Pod is in a failing state.
+//
+// It combines:
+//   - explicit issue detection
+//   - container runtime failures
+//   - pod phase failures
+//   - degraded readiness (after startup grace period)
 func isPodFailing(pod *v1.Pod, issues []incident.ContainerMetadata) bool {
 	if pod == nil {
 		return false
@@ -68,17 +76,14 @@ func isPodFailing(pod *v1.Pod, issues []incident.ContainerMetadata) bool {
 	age := time.Since(pod.CreationTimestamp.Time)
 	isStartup := age < 60*time.Second
 
-	// ======================================================
-	// 🔴 1. HARD SIGNAL (sempre válido, inclusive startup)
-	// ======================================================
+	// Explicit detected issues (always valid)
 	if len(issues) > 0 {
 		return true
 	}
 
-	// ======================================================
-	// 🔴 2. TERMINATED FAILURES (CRITICAL FIX)
-	// ======================================================
+	// Container-level failures
 	for _, cs := range pod.Status.ContainerStatuses {
+
 		if cs.State.Terminated != nil && cs.State.Terminated.ExitCode != 0 {
 			return true
 		}
@@ -91,16 +96,12 @@ func isPodFailing(pod *v1.Pod, issues []incident.ContainerMetadata) bool {
 		}
 	}
 
-	// ======================================================
-	// 🔴 3. POD PHASE FAILURES (startup-safe)
-	// ======================================================
+	// Pod phase failure
 	if pod.Status.Phase == v1.PodFailed {
 		return true
 	}
 
-	// ======================================================
-	// 🟡 4. STARTUP DEGRADED LOGIC (only after grace period)
-	// ======================================================
+	// Degraded readiness (after startup grace period)
 	if !isStartup {
 		if pod.Status.Phase == v1.PodRunning && !isPodHealthy(pod) {
 			return true
@@ -113,18 +114,15 @@ func isPodFailing(pod *v1.Pod, issues []incident.ContainerMetadata) bool {
 // isPodResolved determines whether a Pod no longer requires attention.
 //
 // A Pod is considered resolved when:
-//   - It completed successfully (Succeeded)
-//   - It finished execution
-//   - It is Running and Ready without issues
-//
-// This represents the "no operational intervention needed" state.
+//   - it completed successfully (Succeeded)
+//   - or it is Running and Ready with no detected issues
 func isPodResolved(pod *v1.Pod, containersMetadata []incident.ContainerMetadata) bool {
 
 	if pod == nil {
 		return true
 	}
 
-	// If there are active container issues -> not resolved
+	// Active issues -> not resolved
 	if len(containersMetadata) > 0 {
 		return false
 	}
