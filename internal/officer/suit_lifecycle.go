@@ -24,16 +24,18 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
-// SuitLifecycleManager handles lifecycle side-effects only.
+// SuitLifecycleManager is responsible for emitting lifecycle events.
 //
-// It does NOT decide lifecycle state.
-// It only emits lifecycle events.
+// It does not make lifecycle decisions.
+// It only executes side-effects based on decisions made elsewhere.
 type SuitLifecycleManager struct {
 	Log logr.Logger
 	RDB *goredis.Client
 }
 
-// EmitSuitCloseRequested publishes a suit closure request event.
+// emitSuitCloseRequested publishes a request to close a suit.
+//
+// This is an event emission only; no validation or decision logic is performed here.
 func (m *SuitLifecycleManager) emitSuitCloseRequested(
 	ctx context.Context,
 	incidentID string,
@@ -46,7 +48,7 @@ func (m *SuitLifecycleManager) emitSuitCloseRequested(
 
 	data, err := json.Marshal(payload)
 	if err != nil {
-		m.Log.Error(err, "failed to encode suit close event")
+		m.Log.Error(err, "failed to encode suit close event payload")
 		return
 	}
 

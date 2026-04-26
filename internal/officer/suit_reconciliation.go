@@ -25,7 +25,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// RecoveryHint informs controller that a Pod was recreated.
+// RecoveryHint signals that a Pod was recreated (UID changed).
+//
+// This allows the controller to maintain continuity across Pod recreation
+// without prematurely closing the associated suit.
 type RecoveryHint struct {
 	IncidentID string
 	Namespace  string
@@ -35,10 +38,14 @@ type RecoveryHint struct {
 	CurrentUID  string
 }
 
-// RecoverOpenIncidents reconciles open suits against current cluster state.
+// RecoverOpenIncidents reconciles open suits against the current cluster state.
 //
-// It returns RecoveryHints for UID  changes so that controller
-// can maintain continuity awareness across pod recreation.
+// It performs a full scan of open suits and applies the same closure rules
+// used during controller reconciliation.
+//
+// Returns:
+//   - RecoveryHints for UID transitions (pod recreation)
+//   - error if persistence access fails
 func (s *Service) RecoverOpenIncidents(
 	ctx context.Context,
 	cluster string,
@@ -86,17 +93,17 @@ func (s *Service) RecoverOpenIncidents(
 			continue
 		}
 
-		issues := DetectContainerIssues(ctx, kube, pod)
+		containersMetadata := DetectContainersMetadata(ctx, kube, pod)
 
 		shouldClose, reason := EvaluateSuitClosure(
 			pod,
 			expectedUID,
-			issues,
+			containersMetadata,
 		)
 
 		if shouldClose {
 
-			// UID change → DO NOT close blindly
+			// UID transition → emit hint instead of closing
 			if reason == "pod_recreated" && expectedUID != "" {
 
 				hints = append(hints, RecoveryHint{
@@ -107,14 +114,14 @@ func (s *Service) RecoverOpenIncidents(
 					CurrentUID:  string(pod.UID),
 				})
 
-				logger.Info("uid transition detected (hint emitted, not closed)",
+				logger.Info("pod recreation detected (hint emitted, suit kept open)",
 					"incident_id", suit.IncidentID,
 				)
 
 				continue
 			}
 
-			// true closure cases only
+			// All other closure cases
 			manager.emitSuitCloseRequested(ctx, suit.IncidentID, reason)
 
 			logger.Info("suit closed",
@@ -125,7 +132,7 @@ func (s *Service) RecoverOpenIncidents(
 			continue
 		}
 
-		logger.V(1).Info("pod still requires attention, keeping suit open",
+		logger.V(1).Info("suit remains open",
 			"incident_id", suit.IncidentID,
 		)
 	}

@@ -1,3 +1,19 @@
+/*
+Copyright 2026 Pedro Cozinheiro.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package officer
 
 import (
@@ -7,66 +23,20 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"time"
 
 	"github.com/ghdrope/court/internal/incident"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-const (
-	minPodAge   = 30 * time.Second
-	maxLogBytes = 2 * 1024 * 1024
-)
-
-func DetectContainerIssues(
-	ctx context.Context,
-	client kubernetes.Interface,
-	pod *v1.Pod,
-) []incident.ContainerMetadata {
-
-	if pod == nil {
-		return nil
-	}
-
-	if time.Since(pod.CreationTimestamp.Time) < minPodAge {
-		return nil
-	}
-
-	var issues []incident.ContainerMetadata
-
-	for _, cs := range pod.Status.ContainerStatuses {
-
-		// TERMINATED FAILURES
-		if cs.State.Terminated != nil && cs.State.Terminated.ExitCode != 0 {
-			issues = append(issues, incident.ContainerMetadata{
-				Container: cs.Name,
-				ImageName: cs.Image,
-				Reason: fmt.Sprintf(
-					"terminated (%s exit=%d)",
-					cs.State.Terminated.Reason,
-					cs.State.Terminated.ExitCode,
-				),
-			})
-			continue
-		}
-
-		// WAITING FAILURES
-		if cs.State.Waiting != nil {
-			switch cs.State.Waiting.Reason {
-			case "CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "RunContainerError":
-				issues = append(issues, incident.ContainerMetadata{
-					Container: cs.Name,
-					ImageName: cs.Image,
-					Reason:    cs.State.Waiting.Reason,
-				})
-			}
-		}
-	}
-
-	return issues
-}
-
+// EnrichContainersMetadataWithLogs attaches logs to container metadata.
+//
+// For each container in the Pod:
+//   - ensures a metadata entry exists (even if no issue was detected)
+//   - fetches logs (current and previous)
+//   - assigns logs or a fallback message if unavailable
+//
+// This guarantees a complete evidence set for incident analysis.
 func EnrichContainersMetadataWithLogs(
 	ctx context.Context,
 	client kubernetes.Interface,
@@ -110,16 +80,29 @@ func EnrichContainersMetadataWithLogs(
 	return issues
 }
 
+// fetchContainerLogs retrieves logs for a specific container.
+//   - fetches both current and previous logs (if available)
+//   - applies a size limit (maxLogBytes)
+//   - returns logs as individual lines
+//
+// Special cases:
+//   - system namespace ("court") is blocked
+//   - errors are returned as synthetic log lines
 func fetchContainerLogs(
 	ctx context.Context,
 	client kubernetes.Interface,
 	namespace, podName, container string,
 ) []string {
 
+	if client == nil {
+		return []string{"<no client available>"}
+	}
+
 	if namespace == "court" {
 		return []string{"<blocked system namespace>"}
 	}
 
+	// readLogs fetches logs for either current or previous container instance.
 	readLogs := func(previous bool) []string {
 
 		req := client.CoreV1().
@@ -139,6 +122,7 @@ func fetchContainerLogs(
 			}
 		}()
 
+		// readLogs fetches logs for either current or previous container instance.
 		limited := io.LimitReader(stream, maxLogBytes)
 
 		var buf bytes.Buffer
@@ -157,6 +141,7 @@ func fetchContainerLogs(
 	current := readLogs(false)
 	previous := readLogs(true)
 
+	// If no previous logs, return current only
 	if len(previous) == 0 {
 		return current
 	}

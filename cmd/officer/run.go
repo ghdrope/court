@@ -138,6 +138,7 @@ func runOfficer(
 		KubeClient:  kubeClient,
 		Log:         log.Log.WithName("reconciler"),
 		Service:     svc,
+		SuitRepo:    suitRepo,
 		SuitManager: suitManager,
 		Cluster:     clusterName,
 		RDB:         rdb,

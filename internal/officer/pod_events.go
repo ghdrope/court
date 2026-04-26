@@ -24,7 +24,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// fetchPodEvents retrieves Kubernetes events for a pod.
+// fetchPodEvents retrieves Kubernetes events associated with a specific Pod.
+//
+// It filters events by:
+//   - involved object kind
+//   - UID match
+//   - name match
+//
+// Returns a normalized list of incident.K8sEvent.
 func (r *PodReconciler) fetchPodEvents(
 	ctx context.Context,
 	namespace string,
@@ -51,20 +58,22 @@ func (r *PodReconciler) fetchPodEvents(
 
 	for _, e := range eventList.Items {
 
-		// Only events for this Pod
+		// Filter: only Pod events
 		if e.InvolvedObject.Kind != "Pod" {
 			continue
 		}
 
+		// Filter: strict identity via UID
 		if e.InvolvedObject.UID != pod.UID {
 			continue
 		}
 
+		// Additional safety: name match
 		if e.InvolvedObject.Name != pod.Name {
 			continue
 		}
 
-		// Safety filter: ignore empty noise events
+		// Ignore empty/noise events
 		if e.Type == "" && e.Reason == "" && e.Message == "" {
 			continue
 		}

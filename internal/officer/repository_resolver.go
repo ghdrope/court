@@ -23,54 +23,52 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ImageMetadataProvider allows resolving OCI image metadata.
+// ImageMetadataProvider resolves metadata from OCI images.
 type ImageMetadataProvider interface {
-	// GetImageLabels returns OCI labels for a given image reference.
+	// GetImageLabels returns OCI image labels for the given image reference.
 	GetImageLabels(ctx context.Context, image string) (map[string]string, error)
 }
 
-// resolveRepositoryURL extracts a repository URL from a Pod.
+// resolveRepositoryURL extracts a source repository URL associated with a Pod.
 //
 // Resolution order:
-//  1. annotation: court.dev/repository
-//  2. OCI label: org.opencontainers.image.source
+//  1. Pod annotation: court.dev/repository
+//  2. OCI image label: org.opencontainers.image.source
 //
-// Returns empty string if nothing is found.
+// Returns an empty string if no repository information can be resolved.
 func resolveRepositoryURL(ctx context.Context, log logr.Logger, pod *v1.Pod, imgProvider ImageMetadataProvider) string {
 
 	if pod == nil {
 		return ""
 	}
 
-	// 1. explicit annotation (fast path)
+	// Eexplicit annotation (fast path)
 	if repo, ok := pod.Annotations["court.dev/repository"]; ok && repo != "" {
 		return repo
 	}
 
-	log.V(1).Info("repository not in annotations, checking image metadata")
+	log.V(1).Info("repository not found in annotations, falling back to image metadata")
 
 	if imgProvider == nil {
-		log.V(1).Info("image metadata provider not configured")
+		log.V(1).Info("image metadata provider is not configured")
 		return ""
 	}
 
-	// 2. OCI labels fallback
+	// 2. OCI image metadata
 	for _, c := range pod.Spec.Containers {
 
 		labels, err := imgProvider.GetImageLabels(ctx, c.Image)
 		if err != nil {
-			log.Error(err, "failed to inspect image", "image", c.Image)
+			log.Error(err, "failed to inspect image metadata", "image", c.Image)
 			continue
 		}
 
-		// OCI standard label for source repository
 		if repo, ok := labels["org.opencontainers.image.source"]; ok && repo != "" {
 			return repo
 		}
 	}
 
-	// No repository information found
-	log.V(1).Info("repository not resolved from annotations or image metadata")
+	log.V(1).Info("repository could not be resolved from annotations or image metadata")
 
 	return ""
 }
