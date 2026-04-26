@@ -92,5 +92,27 @@ func (s *Service) CloseTrial(
 
 	logger.Info("closing suit")
 
-	return s.Repo.Close(ctx, suitEntity.ID)
+	// Close issue
+	if err := s.CloseIssue(ctx, suitEntity); err != nil {
+		logger.Error("failed to close VCS issue",
+			zap.String("suit_id", suitEntity.ID),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	// Persist updated state
+	if err := s.Repo.Close(ctx, suitEntity.ID); err != nil {
+		logger.Error("failed to persist suit close",
+			zap.String("suit_id", suitEntity.ID),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	logger.Info("suit closed successfully",
+		zap.String("suit_id", suitEntity.ID),
+	)
+
+	return nil
 }
