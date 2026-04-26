@@ -23,7 +23,9 @@ import (
 	"k8s.io/sample-controller/pkg/signals"
 )
 
-// main initializes logging, signal handling, and executes the CLI.
+// main is the application entrypoint.
+//
+// It initializes logging, signal handling, and executes the CLI.
 func main() {
 	ctx := signals.SetupSignalHandler()
 
@@ -35,11 +37,10 @@ func main() {
 		_ = logger.Sync()
 	}()
 
-	// Global logger
 	zap.ReplaceGlobals(logger)
 
 	if err := Execute(ctx); err != nil {
-		zap.L().Error("fatal error", zap.Error(err))
+		zap.L().Error("application failed", zap.Error(err))
 		os.Exit(1)
 	}
 }

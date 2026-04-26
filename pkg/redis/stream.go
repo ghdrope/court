@@ -19,13 +19,14 @@ package redis
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	goredis "github.com/redis/go-redis/v9"
 )
 
-// StreamClient provides operations over Redis Streams,
-// including publishing, consumer group management, and consumption.
+// StreamClient provides access to Redis Streams operations.
+//
+// It is responsible for stream-level operations such as
+// consumer group creation and message consumption.
 type StreamClient struct {
 	rdb *goredis.Client
 	cfg Config
@@ -40,9 +41,8 @@ func NewStreamClient(rdb *goredis.Client, cfg Config) *StreamClient {
 }
 
 // EnsureGroup creates the consumer group if it does not exist.
-// Operation is idempotent.
 //
-// It uses XGroupCreateMkStream to also create the stream if missing.
+// It is idempotent and safe to call multiple times during startup.
 func (c *StreamClient) EnsureGroup(ctx context.Context) error {
 	err := c.rdb.XGroupCreateMkStream(
 		ctx,
@@ -51,15 +51,16 @@ func (c *StreamClient) EnsureGroup(ctx context.Context) error {
 		"0",
 	).Err()
 
-	if err != nil && err != goredis.Nil && !isBusyGroupError(err) {
-		return fmt.Errorf("create consumer group: %w", err)
+	if err != nil && !isBusyGroupError(err) {
+		return fmt.Errorf("redis: create consumer group: %w", err)
 	}
 
 	return nil
 }
 
 // isBusyGroupError checks whether Redis returned a BUSYGROUP error.
+//
 // This happens when the consumer group already exists.
 func isBusyGroupError(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "BUSYGROUP")
+	return err != nil && goredis.HasErrorPrefix(err, "BUSYGROUP")
 }

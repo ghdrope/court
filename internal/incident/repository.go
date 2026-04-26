@@ -24,22 +24,20 @@ import (
 	"fmt"
 )
 
-// Repository handles persistence of IncidentReports.
-//
-// It is the only layer allowed to interact with the incidents table.
+// Repository handles persistence of IncidentReport entities.
 type Repository struct {
-	DB *sql.DB
+	db *sql.DB
 }
 
 // NewRepository creates a new incident repository.
 func NewRepository(db *sql.DB) *Repository {
-	return &Repository{DB: db}
+	return &Repository{db: db}
 }
 
 // ErrNotFound is returned when an incident does not exist.
 var ErrNotFound = errors.New("incident not found")
 
-// InitSchema ensures the required database schema exists.
+// InitSchema ensures that the incidents table exists.
 func (r *Repository) InitSchema(ctx context.Context) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS incidents (
@@ -62,14 +60,14 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 	ON incidents (namespace, pod);
 	`
 
-	_, err := r.DB.ExecContext(ctx, query)
-	return err
+	if _, err := r.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("init incident schema: %w", err)
+	}
+
+	return nil
 }
 
-// Insert creates a new incident record in the database.
-//
-// This is called by the Officer when a new incident is detected.
-// It is idempotent at the database level.
+// Insert creates or updates an IncidentReport.
 func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
 	if inc == nil {
 		return fmt.Errorf("incident is nil")
@@ -86,49 +84,44 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) error {
 	}
 
 	query := `
-INSERT INTO incidents (
-	id,
-	cluster,
-	namespace,
-	pod,
-	github_repo_url,
-	events,
-	container_issues
-)
-VALUES ($1,$2,$3,$4,$5,$6,$7)
-ON CONFLICT (id) DO UPDATE SET
-	cluster = EXCLUDED.cluster,
-	namespace = EXCLUDED.namespace,
-	pod = EXCLUDED.pod,
-	github_repo_url = EXCLUDED.github_repo_url,
-	events = EXCLUDED.events,
-	container_issues = EXCLUDED.container_issues,
-	updated_at = NOW()
-`
+	INSERT INTO incidents (
+		id,
+		cluster,
+		namespace,
+		pod,
+		github_repo_url,
+		events,
+		container_issues
+	)
+	VALUES ($1,$2,$3,$4,$5,$6,$7)
+	ON CONFLICT (id) DO UPDATE SET
+		cluster = EXCLUDED.cluster,
+		namespace = EXCLUDED.namespace,
+		pod = EXCLUDED.pod,
+		github_repo_url = EXCLUDED.github_repo_url,
+		events = EXCLUDED.events,
+		container_issues = EXCLUDED.container_issues,
+		updated_at = NOW()
+	`
 
-	_, err = r.DB.ExecContext(
+	if _, err = r.db.ExecContext(
 		ctx,
 		query,
 		inc.ID,
 		inc.Cluster,
 		inc.Namespace,
 		inc.Pod,
-		inc.GitHubRepoURL,
+		inc.VCSRepoURL,
 		eventsJSON,
 		issuesJSON,
-	)
-
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("insert incident: %w", err)
 	}
 
 	return nil
 }
 
-// GetByID retrieves a full IncidentReport by its ID.
-//
-// It reconstructs JSON fields (events and container issues)
-// into the domain model.
+// GetByID retrieves an IncidentReport by ID.
 func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, error) {
 	query := `
 	SELECT 
@@ -149,30 +142,22 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 		issuesJSON []byte
 	)
 
-	err := r.DB.QueryRowContext(ctx, query, id).
+	err := r.db.QueryRowContext(ctx, query, id).
 		Scan(
 			&inc.ID,
 			&inc.Cluster,
 			&inc.Namespace,
 			&inc.Pod,
-			&inc.GitHubRepoURL,
+			&inc.VCSRepoURL,
 			&eventsJSON,
 			&issuesJSON,
 		)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("%w: %s", ErrNotFound, id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("query incident: %w", err)
-	}
-
-	if err := json.Unmarshal(eventsJSON, &inc.Events); err != nil {
-		return nil, fmt.Errorf("unmarshal events: %w", err)
-	}
-
-	if err := json.Unmarshal(issuesJSON, &inc.ContainerIssues); err != nil {
-		return nil, fmt.Errorf("unmarshal container issues: %w", err)
 	}
 
 	return &inc, nil

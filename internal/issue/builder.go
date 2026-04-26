@@ -14,30 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package issue
 
 import (
-	"context"
-
-	"github.com/spf13/cobra"
+	"github.com/ghdrope/court/internal/incident"
+	"github.com/ghdrope/court/pkg/vcs"
 )
 
-// rootCmd is the base CLI command for the Court.
-var rootCmd = &cobra.Command{
-	Use:   "court",
-	Short: "Court service for case processing",
-	Long:  "Court consumes incidents and manages suits lifecycle",
-	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		_ = cmd.Help()
-	},
-}
-
-// Execute runs the CLI with context propagation.
-func Execute(ctx context.Context) error {
-	return rootCmd.ExecuteContext(ctx)
-}
-
-func init() {
-	rootCmd.AddCommand(newCourtCommand())
+// BuildFromIncidentReport converts an IncidentRepo into a VCS issue.
+//
+// It generates a structured title and a detailed Markdown body
+// optimized for debugging and automated analysis tool.
+func BuildFromIncidentReport(inc *incident.IncidentReport) vcs.Issue {
+	return vcs.Issue{
+		Title: buildTitle(inc),
+		Body:  buildBody(inc),
+	}
 }

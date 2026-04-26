@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-fail-exemplo2
+  annotations:
+    court.dev/repository: https://github.com/ghdrope/court
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: busybox:1.36
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Iniciando aplicação..."
+          echo "Processando dados..."
+          sleep 5
+          echo "Algo deu errado!"
+          echo "Algo deu errado!"
+          echo "Algo deu errado!"
+          exit 1

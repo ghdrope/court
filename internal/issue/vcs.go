@@ -14,30 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package issue
 
 import (
-	"context"
+	"strings"
 
-	"github.com/spf13/cobra"
+	"github.com/ghdrope/court/internal/incident"
 )
 
-// rootCmd is the base CLI command for the Court.
-var rootCmd = &cobra.Command{
-	Use:   "court",
-	Short: "Court service for case processing",
-	Long:  "Court consumes incidents and manages suits lifecycle",
-	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		_ = cmd.Help()
-	},
-}
+// vcsSectionFor returns provider-specific Markdown sections
+// based on the repository host contained in the URL.
+func vcsSectionFor(inc *incident.IncidentReport) string {
+	repoURL := strings.ToLower(inc.VCSRepoURL)
 
-// Execute runs the CLI with context propagation.
-func Execute(ctx context.Context) error {
-	return rootCmd.ExecuteContext(ctx)
-}
+	switch {
+	case strings.Contains(repoURL, "github.com"):
+		return githubCopilotHintSection()
 
-func init() {
-	rootCmd.AddCommand(newCourtCommand())
+	// ... Add + integrations ...
+
+	default:
+		return ""
+	}
 }

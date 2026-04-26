@@ -20,33 +20,39 @@ import (
 	"context"
 
 	"github.com/ghdrope/court/internal/suit"
+	"github.com/ghdrope/court/pkg/vcs"
 	"go.uber.org/zap"
 )
 
+// SuitRepository defines persistence operations for suits.
 type SuitRepository interface {
 	Insert(ctx context.Context, s *suit.Suit) error
+	UpdateVCSInfo(ctx context.Context, s *suit.Suit) error
 	GetByIncidentID(ctx context.Context, incidentID string) (*suit.Suit, error)
 	Close(ctx context.Context, id string) error
 }
 
-// GitHubClient defines the behavior required to publish issues.
-// This allows mocking and loose coupling with implementation.
-type GitHubClient interface {
-	CreateIssue(ctx context.Context, owner, repo, title, body string) (string, error)
+// VCSClient defines a generic version control system interface.
+//
+// It is intentionally abstract to support multiple providers
+// such as GitHub, GitLab, ...
+type VCSClient interface {
+	CreateIssue(ctx context.Context, owner, repo string, issue vcs.Issue) (vcs.IssueResult, error)
+	CloseIssue(ctx context.Context, issueURL string) (vcs.CloseResult, error)
 }
 
-// Service handles Suit lifecycle creation and updates.
+// Service orchestrates Suit and Issue lifecycle operations.
 type Service struct {
-	Repo   SuitRepository
-	GitHub GitHubClient
-	Log    *zap.Logger
+	Repo SuitRepository
+	VCS  VCSClient
+	Log  *zap.Logger
 }
 
 // New creates a new Court service instance.
-func New(repo SuitRepository, gh GitHubClient, log *zap.Logger) *Service {
+func New(repo SuitRepository, vcsClient VCSClient, log *zap.Logger) *Service {
 	return &Service{
-		Repo:   repo,
-		GitHub: gh,
-		Log:    log,
+		Repo: repo,
+		VCS:  vcsClient,
+		Log:  log,
 	}
 }

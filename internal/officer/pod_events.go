@@ -24,11 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// fetchPodEvents retrieves Kubernetes Events associated with a Pod
-// and converts them into the internal Incident event model.
-//
-// It is defensive by design because Events API is eventually consistent
-// and may return partial or noisy data.
+// fetchPodEvents retrieves Kubernetes events for a pod.
 func (r *PodReconciler) fetchPodEvents(
 	ctx context.Context,
 	namespace string,
@@ -42,6 +38,7 @@ func (r *PodReconciler) fetchPodEvents(
 	eventList, err := r.KubeClient.CoreV1().
 		Events(namespace).
 		List(ctx, metav1.ListOptions{})
+
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +47,7 @@ func (r *PodReconciler) fetchPodEvents(
 		return nil, nil
 	}
 
-	result := make([]incident.K8sEvent, 0, len(eventList.Items))
+	var result []incident.K8sEvent
 
 	for _, e := range eventList.Items {
 
