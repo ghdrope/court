@@ -43,12 +43,21 @@ func (s *Service) HandleIncident(
 
 	logger.Info("incident detected")
 
-	if err := s.IncidentRepo.Insert(ctx, r); err != nil {
+	created, err := s.IncidentRepo.Insert(ctx, r)
+	if err != nil {
 		logger.Error(err, "failed to store incident")
 		return err
 	}
 
-	logger.Info("incident stored")
+	if created {
+		logger.Info("incident stored")
+	} else {
+		logger.Info("incident updated")
+	}
+
+	if !created {
+		return nil
+	}
 
 	// Emit event with only the ID
 	payload := map[string]any{
