@@ -22,16 +22,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// BuildFromPod constructs an IncidentReport from a K8s Pod.
+// BuildFromPod converts a Kubernetes Pod into a domain IncidentReport.
 //
-// It acts as a translation layer between K8s runtime state
-// and the domain IncidentReport model.
+// It acts as a translation layer between Kubernetes runtime state
+// and the internal incident model.
 func BuildFromPod(
 	pod *v1.Pod,
 	cluster string,
 	repoURL string,
 	events []K8sEvent,
-	containerIssues []ContainerIssue,
+	containersMetadata []ContainerMetadata,
 ) (IncidentReport, error) {
 
 	if pod == nil {
@@ -39,7 +39,7 @@ func BuildFromPod(
 	}
 
 	return IncidentReport{
-		// ID is derived from namespace/name/UID to guarantee uniqueness over time.
+		// ID ensures uniqueness across namespace, pod and UID lifecycle.
 		ID: fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, pod.UID),
 
 		Cluster:   cluster,
@@ -48,10 +48,10 @@ func BuildFromPod(
 
 		VCSRepoURL: repoURL,
 
-		// Core evidence
+		// Normalized runtime signals from Kubernetes
 		Events: events,
 
-		// Container-level evidence
-		ContainerIssues: containerIssues,
+		// Container-level failure signals
+		ContainersMetadata: containersMetadata,
 	}, nil
 }

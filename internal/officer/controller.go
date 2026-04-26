@@ -59,9 +59,9 @@ func (r *PodReconciler) Reconcile(
 	}
 
 	// 1. FAST DETECTION (no logs)
-	containerIssues := DetectContainerIssues(ctx, r.KubeClient, &pod)
+	containersMetadata := DetectContainerIssues(ctx, r.KubeClient, &pod)
 
-	shouldHandle := len(containerIssues) > 0 || isPodFailing(&pod, containerIssues)
+	shouldHandle := len(containersMetadata) > 0 || isPodFailing(&pod, containersMetadata)
 
 	if !shouldHandle {
 		r.reconcileOpenSuits(ctx)
@@ -69,8 +69,8 @@ func (r *PodReconciler) Reconcile(
 	}
 
 	// 2. ENSURE WE ALWAYS HAVE EVIDENCE BASE
-	if len(containerIssues) == 0 {
-		containerIssues = []incident.ContainerIssue{
+	if len(containersMetadata) == 0 {
+		containersMetadata = []incident.ContainerMetadata{
 			{
 				Container: firstContainer(&pod),
 				ImageName: firstImage(&pod),
@@ -89,8 +89,8 @@ func (r *PodReconciler) Reconcile(
 		return ctrl.Result{}, err
 	}
 
-	if len(containerIssues) == 0 {
-		containerIssues = []incident.ContainerIssue{
+	if len(containersMetadata) == 0 {
+		containersMetadata = []incident.ContainerMetadata{
 			{
 				Container: firstContainer(&pod),
 				ImageName: firstImage(&pod),
@@ -99,11 +99,11 @@ func (r *PodReconciler) Reconcile(
 		}
 	}
 
-	containerIssues = EnrichContainerIssuesWithLogs(
+	containersMetadata = EnrichContainersMetadataWithLogs(
 		ctx,
 		r.KubeClient,
 		&pod,
-		containerIssues,
+		containersMetadata,
 	)
 
 	report, err := incident.BuildFromPod(
@@ -111,7 +111,7 @@ func (r *PodReconciler) Reconcile(
 		r.Cluster,
 		repoURL,
 		events,
-		containerIssues,
+		containersMetadata,
 	)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -198,12 +198,12 @@ func (r *PodReconciler) reconcileOpenSuits(ctx context.Context) {
 			continue
 		}
 
-		containerIssues := DetectContainerIssues(ctx, r.KubeClient, pod)
+		containersMetadata := DetectContainerIssues(ctx, r.KubeClient, pod)
 
 		shouldClose, reason := EvaluateSuitClosure(
 			pod,
 			expectedUID,
-			containerIssues,
+			containersMetadata,
 		)
 
 		if shouldClose {

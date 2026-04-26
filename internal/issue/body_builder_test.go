@@ -68,7 +68,7 @@ func TestBuildContainersSection_NoContainers(t *testing.T) {
 	t.Parallel()
 
 	inc := &incident.IncidentReport{
-		ContainerIssues: []incident.ContainerIssue{},
+		ContainersMetadata: []incident.ContainerMetadata{},
 	}
 
 	got := buildContainersSection(inc)
@@ -84,7 +84,7 @@ func TestBuildContainersSection_WithContainers(t *testing.T) {
 	t.Parallel()
 
 	inc := &incident.IncidentReport{
-		ContainerIssues: []incident.ContainerIssue{
+		ContainersMetadata: []incident.ContainerMetadata{
 			{
 				Container: "api",
 				ImageName: "nginx:latest",

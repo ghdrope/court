@@ -31,7 +31,7 @@ import (
 func EvaluateSuitClosure(
 	pod *v1.Pod,
 	expectedUID string,
-	containerIssues []incident.ContainerIssue,
+	containersMetadata []incident.ContainerMetadata,
 ) (bool, string) {
 
 	// Pod no longer exists in cluster
@@ -45,7 +45,7 @@ func EvaluateSuitClosure(
 	}
 
 	// Pod recovery condition
-	if isPodResolved(pod, containerIssues) {
+	if isPodResolved(pod, containersMetadata) {
 		return true, "pod_resolved"
 	}
 

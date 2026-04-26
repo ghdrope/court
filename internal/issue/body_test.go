@@ -46,7 +46,7 @@ func TestBuildBody_Complete(t *testing.T) {
 		Events: []incident.K8sEvent{
 			{Type: "info", Reason: "start", Message: "ok"},
 		},
-		ContainerIssues: []incident.ContainerIssue{
+		ContainersMetadata: []incident.ContainerMetadata{
 			{
 				Container: "api",
 				ImageName: "nginx",

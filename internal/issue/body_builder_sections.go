@@ -62,13 +62,13 @@ func buildEventsSection(inc *incident.IncidentReport) string {
 // buildContainersSection renders container-related failure data
 // including image name and associated logs.
 func buildContainersSection(inc *incident.IncidentReport) string {
-	if len(inc.ContainerIssues) == 0 {
+	if len(inc.ContainersMetadata) == 0 {
 		return "_No container issues detected_"
 	}
 
 	var out []string
 
-	for _, c := range inc.ContainerIssues {
+	for _, c := range inc.ContainersMetadata {
 		entry := fmt.Sprintf(
 			"### Container `%s`\n- Image: `%s`\n#### Logs\n```\n%s\n```",
 			c.Container,

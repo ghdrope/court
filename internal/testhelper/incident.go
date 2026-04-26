@@ -32,7 +32,7 @@ func NewIncidentWithEvents() *incident.IncidentReport {
 func NewIncidentWithContainers() *incident.IncidentReport {
 	inc := NewIncidentReport()
 
-	inc.ContainerIssues = []incident.ContainerIssue{
+	inc.ContainersMetadata = []incident.ContainerMetadata{
 		{
 			Container: "api",
 			ImageName: "nginx:latest",

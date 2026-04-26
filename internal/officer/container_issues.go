@@ -23,7 +23,7 @@ func DetectContainerIssues(
 	ctx context.Context,
 	client kubernetes.Interface,
 	pod *v1.Pod,
-) []incident.ContainerIssue {
+) []incident.ContainerMetadata {
 
 	if pod == nil {
 		return nil
@@ -33,13 +33,13 @@ func DetectContainerIssues(
 		return nil
 	}
 
-	var issues []incident.ContainerIssue
+	var issues []incident.ContainerMetadata
 
 	for _, cs := range pod.Status.ContainerStatuses {
 
 		// TERMINATED FAILURES
 		if cs.State.Terminated != nil && cs.State.Terminated.ExitCode != 0 {
-			issues = append(issues, incident.ContainerIssue{
+			issues = append(issues, incident.ContainerMetadata{
 				Container: cs.Name,
 				ImageName: cs.Image,
 				Reason: fmt.Sprintf(
@@ -55,7 +55,7 @@ func DetectContainerIssues(
 		if cs.State.Waiting != nil {
 			switch cs.State.Waiting.Reason {
 			case "CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "RunContainerError":
-				issues = append(issues, incident.ContainerIssue{
+				issues = append(issues, incident.ContainerMetadata{
 					Container: cs.Name,
 					ImageName: cs.Image,
 					Reason:    cs.State.Waiting.Reason,
@@ -67,14 +67,14 @@ func DetectContainerIssues(
 	return issues
 }
 
-func EnrichContainerIssuesWithLogs(
+func EnrichContainersMetadataWithLogs(
 	ctx context.Context,
 	client kubernetes.Interface,
 	pod *v1.Pod,
-	issues []incident.ContainerIssue,
-) []incident.ContainerIssue {
+	issues []incident.ContainerMetadata,
+) []incident.ContainerMetadata {
 
-	issueMap := map[string]*incident.ContainerIssue{}
+	issueMap := map[string]*incident.ContainerMetadata{}
 	for i := range issues {
 		issueMap[issues[i].Container] = &issues[i]
 	}
@@ -84,7 +84,7 @@ func EnrichContainerIssuesWithLogs(
 		issue, exists := issueMap[c.Name]
 
 		if !exists {
-			issues = append(issues, incident.ContainerIssue{
+			issues = append(issues, incident.ContainerMetadata{
 				Container: c.Name,
 				ImageName: c.Image,
 				Reason:    "no detected failure (log enrichment)",

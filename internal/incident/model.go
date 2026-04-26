@@ -16,15 +16,15 @@ limitations under the License.
 
 package incident
 
-// IncidentReport is a representation of a Kubernetes workload failure.
+// IncidentReport represents a Kubernetes workload failure.
 //
-// It is produced ONLY for workloads whose failure type has been recognized
-// by the pod reconciler.
+// It aggregates normalized runtime signals and metadata required
+// for debugging and external issue creation.
 type IncidentReport struct {
 	// ID uniquely identifies the incident.
 	ID string
 
-	// Target workload identity.
+	// Workload identity
 	Cluster   string
 	Namespace string
 	Pod       string
@@ -36,8 +36,8 @@ type IncidentReport struct {
 	// Events contains normalized Kubernetes events related to the failure.
 	Events []K8sEvent
 
-	// ContainerIssues contains failure signals for affected containers.
-	ContainerIssues []ContainerIssue
+	// ContainersMetadata contains failure signals for affected containers.
+	ContainersMetadata []ContainerMetadata
 }
 
 // K8sEvent represents a single Kubernetes event associated with a Pod.
@@ -59,8 +59,8 @@ type K8sEvent struct {
 	Message string
 }
 
-// ContainerIssue represents a failure observed in a specific container.
-type ContainerIssue struct {
+// ContainerMetadata represents a failed pod's container metadata.
+type ContainerMetadata struct {
 	Container string
 	ImageName string
 	Reason    string

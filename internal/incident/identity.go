@@ -21,13 +21,13 @@ import (
 	"strings"
 )
 
-// ParseIncidentID extracts pod and namespace from an IncidentID.
+// ParseIncidentID extracts namespace, pod and UID from an incident identifier.
 //
 // Expected format:
 //
 //	namespace/pod/uid
 //
-// The UID component is ignored and used only for uniqueness.
+// UID is used only for uniqueness and may be ignored by consumers.
 func ParseIncidentID(id string) (pod string, namespace string, uid string, err error) {
 	parts := strings.Split(id, "/")
 
@@ -35,8 +35,8 @@ func ParseIncidentID(id string) (pod string, namespace string, uid string, err e
 		return "", "", "", fmt.Errorf("invalid incident id format: %s", id)
 	}
 
-	namespace = parts[0]
-	pod = parts[1]
+	pod = parts[0]
+	namespace = parts[1]
 	uid = parts[2]
 
 	return pod, namespace, uid, nil
