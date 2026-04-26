@@ -33,10 +33,21 @@ const (
 //
 // It does NOT dulicate the IncidentReport. It only references it.
 type Suit struct {
-	ID          string
-	IncidentID  string
-	Status      Status
-	CreatedAt   time.Time
-	ClosedAt    *time.Time
+	// ID is the unique identifier of the Suit.
+	ID string
+
+	// IncidentID links the Suit to an Incident.
+	IncidentID string
+
+	// Status represents the current lifecycle state.
+	Status Status
+
+	// CreatedAt is when the Suit was created.
+	CreatedAt time.Time
+
+	// ClosedAt is wehn the Suit was closed (nil if still open).
+	ClosedAt *time.Time
+
+	// VCSIssueURL is the external issue tracking URL.
 	VCSIssueURL string
 }

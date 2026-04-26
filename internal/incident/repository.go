@@ -24,7 +24,7 @@ import (
 	"fmt"
 )
 
-// Repository handles persistence of IncidentReport entities.
+// Repository handles persistence for IncidentReport entities.
 type Repository struct {
 	db *sql.DB
 }
@@ -34,10 +34,10 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// ErrNotFound is returned when an incident does not exist.
+// ErrNotFound is returned when an incident cannot be found in storage.
 var ErrNotFound = errors.New("incident not found")
 
-// InitSchema ensures that the incidents table exists.
+// InitSchema ensures required database structures exist.
 func (r *Repository) InitSchema(ctx context.Context) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS incidents (
@@ -50,7 +50,7 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 		github_repo_url TEXT,
 
 		events JSONB NOT NULL DEFAULT '[]',
-		container_issues JSONB NOT NULL DEFAULT '[]',
+		containers_metadata JSONB NOT NULL DEFAULT '[]',
 
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -68,7 +68,8 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 	return nil
 }
 
-// Insert creates or updates an IncidentReport.
+// Insert stores or updates an IncidentReport.
+// Returns true if a new record was created.
 func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) (bool, error) {
 	if inc == nil {
 		return false, fmt.Errorf("incident is nil")
@@ -79,7 +80,7 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) (bool, err
 		return false, err
 	}
 
-	issuesJSON, err := json.Marshal(inc.ContainerIssues)
+	issuesJSON, err := json.Marshal(inc.ContainersMetadata)
 	if err != nil {
 		return false, err
 	}
@@ -92,7 +93,7 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) (bool, err
 		pod,
 		github_repo_url,
 		events,
-		container_issues
+		containers_metadata
 	)
 	VALUES ($1,$2,$3,$4,$5,$6,$7)
 	ON CONFLICT (id) DO UPDATE SET
@@ -101,7 +102,7 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) (bool, err
 		pod = EXCLUDED.pod,
 		github_repo_url = EXCLUDED.github_repo_url,
 		events = EXCLUDED.events,
-		container_issues = EXCLUDED.container_issues,
+		containers_metadata = EXCLUDED.containers_metadata,
 		updated_at = NOW()
 	RETURNING (xmax = 0) AS inserted
 	`
@@ -127,7 +128,7 @@ func (r *Repository) Insert(ctx context.Context, inc *IncidentReport) (bool, err
 	return created, nil
 }
 
-// GetByID retrieves an IncidentReport by ID.
+// GetByID retrieves an IncidentReport by its ID.
 func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, error) {
 	query := `
 	SELECT 
@@ -137,7 +138,7 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 		pod,
 		github_repo_url,
 		events,
-		container_issues
+		containers_metadata
 	FROM incidents
 	WHERE id = $1
 	`
@@ -173,7 +174,7 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*IncidentReport, e
 	}
 
 	if len(issuesJSON) > 0 {
-		if err := json.Unmarshal(issuesJSON, &inc.ContainerIssues); err != nil {
+		if err := json.Unmarshal(issuesJSON, &inc.ContainersMetadata); err != nil {
 			return nil, fmt.Errorf("unmarshal container issues: %w", err)
 		}
 	}

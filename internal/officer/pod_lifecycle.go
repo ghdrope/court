@@ -60,7 +60,7 @@ func shouldIgnorePod(pod *v1.Pod) bool {
 	return false
 }
 
-func isPodFailing(pod *v1.Pod, issues []incident.ContainerIssue) bool {
+func isPodFailing(pod *v1.Pod, issues []incident.ContainerMetadata) bool {
 	if pod == nil {
 		return false
 	}
@@ -118,14 +118,14 @@ func isPodFailing(pod *v1.Pod, issues []incident.ContainerIssue) bool {
 //   - It is Running and Ready without issues
 //
 // This represents the "no operational intervention needed" state.
-func isPodResolved(pod *v1.Pod, containerIssues []incident.ContainerIssue) bool {
+func isPodResolved(pod *v1.Pod, containersMetadata []incident.ContainerMetadata) bool {
 
 	if pod == nil {
 		return true
 	}
 
 	// If there are active container issues -> not resolved
-	if len(containerIssues) > 0 {
+	if len(containersMetadata) > 0 {
 		return false
 	}
 

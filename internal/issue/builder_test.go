@@ -14,30 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package incident
+package issue
 
 import (
-	"fmt"
-	"strings"
+	"testing"
+
+	"github.com/ghdrope/court/internal/testhelper"
 )
 
-// ParseIncidentID extracts namespace, pod and UID from an incident identifier.
-//
-// Expected format:
-//
-//	namespace/pod/uid
-//
-// UID is used only for uniqueness and may be ignored by consumers.
-func ParseIncidentID(id string) (pod string, namespace string, uid string, err error) {
-	parts := strings.Split(id, "/")
+// TestBuildFromIncidentReport ensures an IncidentReport is correctly
+// transformed into a VCS issue with title and body populated.
+func TestBuildFromIncidentReport(t *testing.T) {
+	t.Parallel()
 
-	if len(parts) < 3 {
-		return "", "", "", fmt.Errorf("invalid incident id format: %s", id)
+	inc := testhelper.NewIncidentReport()
+
+	issue := BuildFromIncidentReport(inc)
+
+	if issue.Title == "" {
+		t.Fatalf("expected title to be set")
 	}
 
-	pod = parts[0]
-	namespace = parts[1]
-	uid = parts[2]
-
-	return pod, namespace, uid, nil
+	if issue.Body == "" {
+		t.Fatalf("expected body to be set")
+	}
 }

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,24 +16,20 @@ limitations under the License.
 
 package issue
 
-import (
-	"fmt"
+import "testing"
 
-	"github.com/ghdrope/court/internal/incident"
-)
+// TestGitHubCopilotHintSection ensures GitHub hint section
+// is always returned in valid Markdown format.
+func TestGitHubCopilotHintSection(t *testing.T) {
+	t.Parallel()
 
-// buildTitle generates a human-readable issue title.
-//
-// The title is optimized for quick scanning in VCS issue lists.
-func buildTitle(inc *incident.IncidentReport) string {
-	if inc == nil {
-		return "🚨 nil incident report"
+	got := githubCopilotHintSection()
+
+	if got == "" {
+		t.Fatalf("expected non-empty hint section")
 	}
 
-	return fmt.Sprintf(
-		"🚨 %s failed — %s/%s",
-		inc.Pod,
-		inc.Cluster,
-		inc.Namespace,
-	)
+	if len(got) < 20 {
+		t.Errorf("unexpectedly short hint section")
+	}
 }

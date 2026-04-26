@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-// Repository handles persistence of Suit entities.
+// Repository provides database access for Suit persistence operations.
 type Repository struct {
 	db *sql.DB
 }
@@ -43,7 +43,7 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 		status TEXT NOT NULL,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 		closed_at TIMESTAMPTZ,
-		github_issue_url TEXT
+		vcs_issue_url TEXT
 	);
 
 	CREATE UNIQUE INDEX IF NOT EXISTS idx_suits_incident_id_unique
@@ -58,7 +58,7 @@ func (r *Repository) InitSchema(ctx context.Context) error {
 }
 
 // Insert creates a new Suit.
-// If a suit already exists for the same incident, it is ignored.
+// If a Suit already exists for the same incident_id, the insert is ignored (no update is performed).
 func (r *Repository) Insert(ctx context.Context, s *Suit) error {
 	if s == nil {
 		return fmt.Errorf("suit is nil")
@@ -71,7 +71,7 @@ func (r *Repository) Insert(ctx context.Context, s *Suit) error {
 		status,
 		created_at,
 		closed_at,
-		github_issue_url
+		vcs_issue_url
 	)
 	VALUES ($1,$2,$3,$4,$5,$6)
 	ON CONFLICT (incident_id) DO NOTHING
@@ -106,7 +106,7 @@ func (r *Repository) UpdateVCSInfo(ctx context.Context, s *Suit) error {
 
 	query := `
 	UPDATE suits
-	SET github_issue_url = $1
+	SET vcs_issue_url = $1
 	WHERE id = $2
 	`
 
@@ -118,9 +118,10 @@ func (r *Repository) UpdateVCSInfo(ctx context.Context, s *Suit) error {
 }
 
 // GetByIncidentID retrieves a Suit by its incident ID.
+// Returns (nil, nil) if no Suit is found.
 func (r *Repository) GetByIncidentID(ctx context.Context, incidentID string) (*Suit, error) {
 	query := `
-	SELECT id, incident_id, status, created_at, closed_at, github_issue_url
+	SELECT id, incident_id, status, created_at, closed_at, vcs_issue_url
 	FROM suits
 	WHERE incident_id = $1
 	`
@@ -149,7 +150,7 @@ func (r *Repository) GetByIncidentID(ctx context.Context, incidentID string) (*S
 // ListOpen returns all suits that are currently open.
 func (r *Repository) ListOpen(ctx context.Context) ([]Suit, error) {
 	query := `
-	SELECT id, incident_id, status, created_at, closed_at, github_issue_url
+	SELECT id, incident_id, status, created_at, closed_at, vcs_issue_url
 	FROM suits
 	WHERE status = $1
 	`
@@ -190,7 +191,7 @@ func (r *Repository) ListOpen(ctx context.Context) ([]Suit, error) {
 	return result, nil
 }
 
-// Close marks a Suit as closed.
+// Close marks a Suit as closed by updating its status and setting closed_at to current time.
 func (r *Repository) Close(ctx context.Context, id string) error {
 	now := time.Now()
 

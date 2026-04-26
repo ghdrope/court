@@ -19,7 +19,7 @@ package env
 import (
 	"testing"
 
-	testhelper "github.com/ghdrope/court/pkg/testhelper"
+	testhelper "github.com/ghdrope/court/internal/testhelper"
 )
 
 // TestGet verifies environment variable fallback behavior.

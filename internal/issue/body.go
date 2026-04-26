@@ -1,8 +1,23 @@
+/*
+Copyright 2026 Pedro Cozinheiro.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package issue
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ghdrope/court/internal/incident"
 )
@@ -13,70 +28,9 @@ func buildBody(inc *incident.IncidentReport) string {
 		return "## 🚨 Incident report is nil"
 	}
 
-	// -------------------------
-	// EVENTS
-	// -------------------------
-	var normalEvents []string
-	var warningEvents []string
+	eventsSection := buildEventsSection(inc)
+	containersSection := buildContainersSection(inc)
 
-	for _, e := range inc.Events {
-		line := fmt.Sprintf("- [%s] %s: %s", e.Type, e.Reason, e.Message)
-
-		if strings.EqualFold(e.Type, "warning") {
-			warningEvents = append(warningEvents, line)
-		} else {
-			normalEvents = append(normalEvents, line)
-		}
-	}
-
-	eventsSection := "No events available"
-
-	if len(warningEvents) > 0 || len(normalEvents) > 0 {
-		var b strings.Builder
-
-		if len(warningEvents) > 0 {
-			b.WriteString("### Warnings\n```\n")
-			b.WriteString(strings.Join(warningEvents, "\n"))
-			b.WriteString("\n```\n\n")
-		}
-
-		if len(normalEvents) > 0 {
-			b.WriteString("### Events\n```\n")
-			b.WriteString(strings.Join(normalEvents, "\n"))
-			b.WriteString("\n```")
-		}
-
-		eventsSection = b.String()
-	}
-
-	// -------------------------
-	// CONTAINERS
-	// -------------------------
-	var containers []string
-
-	if len(inc.ContainerIssues) == 0 {
-		containers = append(containers, "_No container issues detected_")
-	} else {
-		for _, c := range inc.ContainerIssues {
-			logs := formatLogs(c.Logs)
-
-			entry := fmt.Sprintf(
-				"### Container `%s`\n"+
-					"- Image: `%s`\n"+
-					"#### Logs\n"+
-					"```\n%s\n```",
-				c.Container,
-				c.ImageName,
-				logs,
-			)
-
-			containers = append(containers, entry)
-		}
-	}
-
-	// -------------------------
-	// BODY
-	// -------------------------
 	body := fmt.Sprintf(`
 ## 🚨 Automated Incident Report
 
@@ -132,7 +86,7 @@ Please review the following:
 		inc.Namespace,
 		inc.Pod,
 		eventsSection,
-		strings.Join(containers, "\n\n"),
+		containersSection,
 	)
 
 	body += vcsSectionFor(inc)

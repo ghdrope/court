@@ -14,30 +14,33 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package incident
+package issue
 
-import (
-	"fmt"
-	"strings"
-)
+import "testing"
 
-// ParseIncidentID extracts namespace, pod and UID from an incident identifier.
-//
-// Expected format:
-//
-//	namespace/pod/uid
-//
-// UID is used only for uniqueness and may be ignored by consumers.
-func ParseIncidentID(id string) (pod string, namespace string, uid string, err error) {
-	parts := strings.Split(id, "/")
+// TestFormatLogs_Empty ensures empty logs return fallback message.
+func TestFormatLogs_Empty(t *testing.T) {
+	t.Parallel()
 
-	if len(parts) < 3 {
-		return "", "", "", fmt.Errorf("invalid incident id format: %s", id)
+	got := formatLogs([]string{})
+
+	if got != "<no logs available>" {
+		t.Errorf("unexpected output for empty logs: %s", got)
+	}
+}
+
+// TestFormatLogs_Content ensures logs are joined correctly.
+func TestFormatLogs_Content(t *testing.T) {
+	t.Parallel()
+
+	logs := []string{
+		"line1",
+		"line2",
 	}
 
-	pod = parts[0]
-	namespace = parts[1]
-	uid = parts[2]
+	got := formatLogs(logs)
 
-	return pod, namespace, uid, nil
+	if got != "line1\nline2" {
+		t.Errorf("unexpected formatted logs: %s", got)
+	}
 }
