@@ -74,19 +74,36 @@ func EnrichContainerIssuesWithLogs(
 	issues []incident.ContainerIssue,
 ) []incident.ContainerIssue {
 
+	issueMap := map[string]*incident.ContainerIssue{}
 	for i := range issues {
+		issueMap[issues[i].Container] = &issues[i]
+	}
 
-		container := issues[i].Container
-		if container == "" {
-			container = firstContainer(pod)
+	for _, c := range pod.Spec.Containers {
+
+		issue, exists := issueMap[c.Name]
+
+		if !exists {
+			issues = append(issues, incident.ContainerIssue{
+				Container: c.Name,
+				ImageName: c.Image,
+				Reason:    "no detected failure (log enrichment)",
+			})
+			issue = &issues[len(issues)-1]
 		}
 
-		logs := fetchContainerLogs(ctx, client, pod.Namespace, pod.Name, container)
+		logs := fetchContainerLogs(
+			ctx,
+			client,
+			pod.Namespace,
+			pod.Name,
+			c.Name,
+		)
 
 		if len(logs) == 0 {
-			issues[i].Logs = []string{"<no logs available>"}
+			issue.Logs = []string{"<no logs available>"}
 		} else {
-			issues[i].Logs = logs
+			issue.Logs = logs
 		}
 	}
 
