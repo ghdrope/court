@@ -19,7 +19,7 @@ package env
 import (
 	"testing"
 
-	testhelper "github.com/ghdrope/court/pkg/testhelper"
+	testhelper "github.com/ghdrope/court/internal/testhelper"
 )
 
 // TestRequire verifies the behavior of required environment variables.

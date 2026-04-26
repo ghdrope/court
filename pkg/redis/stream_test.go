@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ghdrope/court/pkg/testhelper"
+	"github.com/ghdrope/court/internal/testhelper"
 	goredis "github.com/redis/go-redis/v9"
 )
 

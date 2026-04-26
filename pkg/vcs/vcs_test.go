@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	testhelper "github.com/ghdrope/court/pkg/testhelper"
+	testhelper "github.com/ghdrope/court/internal/testhelper"
 )
 
 // TestFakeClient_CreateIssue verifies that CreateIssue returns a valid issue map.
