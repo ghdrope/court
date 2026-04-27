@@ -21,8 +21,11 @@ CI_VULN_REPORT_DIR := $(ARTIFACTS_DIR)/security/images
 CI_VULN_SCANNER := trivy
 CI_VULN_SEVERITIES := HIGH,CRITICAL
 COMPONENT ?=
+GOARCH ?= amd64 
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
 GOCACHE_DIR := go-build
+GOOS ?= linux
+GOARCH ?= amd64 
 GOVULNCHECK_ARTIFACT := govulncheck-report.json
 PREFIX ?= /usr/local
 PROJECT_NAME := court
@@ -153,23 +156,44 @@ lint: ## Run golangci-lint
 		exit 1; \
 	fi
 
+.PHONY: helm-lint
+helm-lint: ## Run helm lint for charts
+	@echo "[TASK] Running helm lint"
+	@if ! command -v helm >/dev/null 2>&1; then \
+		echo "❌ Helm is not installed"; \
+		exit 1; \
+	fi
+	@helm lint charts/
+	@echo "✅ Helm lint completed successfully"
+
+.PHONY: helm-template
+helm-template: ## Render helm templates to validate YAML
+	@echo "[TASK] Rendering helm templates"
+	@if ! command -v helm >/dev/null 2>&1; then \
+		echo "❌ Helm is not installed"; \
+		exit 1; \
+	fi
+	@helm template court charts/ > /dev/null
+	@echo "✅ Helm templates render successfully"
+
 
 # ==== Build lifecycle ====
 .PHONY: build
 build: check-component # Build a single component binary
-	@echo "[TASK] Building component $(COMPONENT)"
+	@echo "[TASK] Building $(COMPONENT) for $(GOOS)/$(GOARCH)"
 
 	@mkdir -p "$(CACHE_DIR)/$(GOCACHE_DIR)" "$(BIN_DIR)/"
+
 	@export GOCACHE="$(CACHE_DIR)/$(GOCACHE_DIR)" && \
 	\
 	go mod download && \
 	echo "🔨 Building binary" && \
-	go build -ldflags "\
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "\
 		-X 'court/pkg/version.Version=$(VERSION)' \
 		-X 'court/pkg/version.GitCommit=$(GIT_COMMIT)' \
 		-X 'court/pkg/version.BuildDate=$(BUILD_DATE)'" \
 		-o "$(BIN_DIR)/$(PROJECT_NAME)-$(COMPONENT)" "$(PWD)/cmd/$(COMPONENT)"; \
-	echo "✅ Build completed successfully"; \
+	echo "✅ Build completed successfully $(GOOS)/$(GOARCH)"; \
 
 
 # ==== Tests ====

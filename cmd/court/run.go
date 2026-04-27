@@ -48,15 +48,13 @@ const (
 // It wires all dependencies and starts the event processing pipeline.
 func runCourt(
 	cmdCtx context.Context,
-	redisAddr string,
-	dsn string,
 ) error {
 
 	logger := zap.L().With(zap.String("service", "court"))
 
 	// --- Configuration ---
-	databaseURL := env.FirstNonEmpty(dsn, env.Get("DATABASE_URL", defaultDSN))
-	redisAddress := env.FirstNonEmpty(redisAddr, env.Get("REDIS_ADDR", defaultRedisAddr))
+	databaseURL := env.Must("DATABASE_URL")
+	redisAddress := env.Must("REDIS_ADDR")
 	ghToken := env.Must("GITHUB_TOKEN")
 
 	logger.Info("configuration loaded")

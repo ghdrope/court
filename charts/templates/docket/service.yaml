@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: docket
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: docket
+    {{- include "court.labels" . | nindent 4 }}
+  
+spec:
+  # Internal Redis service
+  type: ClusterIP
+
+  selector:
+    app.kubernetes.io/name: docket
+
+  ports:
+    - name: redis
+      port: {{ .Values.docket.service.port }}
+      targetPort: {{ .Values.docket.service.port }}
+      protocol: TCP
+      

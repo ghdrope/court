@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: officer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: court
+    app.kubernetes.io/component: officer
+    {{- include "court.labels" . | nindent 4 }}
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: officer
+  
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: officer
+
+    spec:
+      # Attach RBAC permissions
+      serviceAccountName: officer
+
+      containers:
+        - name: officer
+          image: ghcr.io/ghdrope/court-officer:{{ .Values.global.version }}
+
+          # Entrypoint for the controller
+          command: ["/go/bin/court/officer"]
+          args: ["officer"]
+
+          env:
+            # ---------------------------
+            # Archive (PostgreSQL) connection
+            # ---------------------------
+            - name: DATABASE_URL
+              value: {{ include "court.database.url" . | quote }}
+            
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "archive-secret" .Values.archive.auth.existingSecret }}
+                  key: POSTGRES_PASSWORD
+
+            # ---------------------------
+            # Docket (Redis)
+            # ---------------------------
+            - name: REDIS_ADDR
+              value: "{{ include "court.docket.host" . }}:{{ .Values.docket.service.port }}"
+            
+            # ---------------------------
+            # App config
+            # ---------------------------
+            - name: CLUSTER_NAME
+              value: {{ .Values.officer.clusterName | quote }}
+
+          # Resources tuning
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+            

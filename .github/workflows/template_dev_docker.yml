@@ -7,9 +7,16 @@ on:
         required: true
         type: string
 
+env:
+  REGISTRY: ghcr.io
+
 jobs:
   image_build-and-deploy:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
 
     steps:
       - name: Checkout repo
@@ -26,9 +33,18 @@ jobs:
           go-version: 1.26
           cache: true
           cache-dependency-path: go.sum
-
+          
       - name: Build Go binary
-        run: make build-${{ inputs.component }}
+        run: |
+          if [ "${{ matrix.arch }}" = "amd64" ]; then
+            export GOARCH=amd64
+          else
+            export GOARCH=arm64
+          fi
+
+          export GOOS=linux
+
+          make build-${{ inputs.component }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -41,7 +57,7 @@ jobs:
         id: metadata
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}-${{ inputs.component }}
+          images: ${{ env.REGISTRY }}/${{ github.repository }}-${{ inputs.component }}
           tags: |
             type=raw,value=dev
           labels: |
@@ -64,7 +80,7 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/${{ matrix.arch }}
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           cache-from: type=gha
@@ -74,3 +90,5 @@ jobs:
             VERSION=development
             BUILD_DATE=${{ env.BUILD_DATE }}
             GIT_COMMIT=${{ github.sha }}
+            GOARCH=${{ matrix.arch }}
+            GOOS=linux

@@ -24,13 +24,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-const defaultDsnAddr = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
-const defaultRedisAddr = "localhost:6379"
-
 func runOfficer(
 	ctx context.Context,
-	redisAddr string,
-	dsn string,
 ) error {
 
 	logger := ctrl.Log.WithName("officer")
@@ -39,25 +34,12 @@ func runOfficer(
 	// ---------------------------
 	// CONFIG
 	// ---------------------------
+	databaseURL := env.Must("DATABASE_URL")
+	redisAddress := env.Must("REDIS_ADDR")
 	clusterName := env.Must("CLUSTER_NAME")
-
-	databaseURL := env.FirstNonEmpty(dsn, env.Get("DATABASE_URL", defaultDsnAddr))
-	redisAddress := env.FirstNonEmpty(redisAddr, env.Get("REDIS_ADDR", defaultRedisAddr))
-
-	envMode := env.Get("ENV", "development")
-
-	if envMode == "production" {
-		if databaseURL == defaultDsnAddr {
-			return fmt.Errorf("DATABASE_URL must be explicitly set in production")
-		}
-		if redisAddress == defaultRedisAddr {
-			return fmt.Errorf("REDIS_ADDR must be explicitly set in production")
-		}
-	}
 
 	logger.Info("configuration loaded",
 		"cluster", clusterName,
-		"env", envMode,
 	)
 
 	// ---------------------------
@@ -124,6 +106,7 @@ func runOfficer(
 	if err != nil {
 		return fmt.Errorf("create controller manager: %w", err)
 	}
+	logger.Info("manager created")
 
 	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {

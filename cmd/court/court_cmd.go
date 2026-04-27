@@ -24,25 +24,15 @@ import "github.com/spf13/cobra"
 // all application bootstrap logic.
 func newCourtCommand() *cobra.Command {
 
-	var (
-		redisAddr string
-		dsn       string
-	)
-
 	cmd := &cobra.Command{
 		Use:   "court",
 		Short: "Start Court worker",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCourt(
 				cmd.Context(),
-				redisAddr,
-				dsn,
 			)
 		},
 	}
-
-	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
-	cmd.Flags().StringVar(&dsn, "database-url", "", "PostgreSQL DSN")
 
 	return cmd
 }
