@@ -1,0 +1,21 @@
+apiVersion: v2
+name: court
+description: Helm chart for deploying Court
+
+type: application
+
+# Chart version (increment on ANY chart/template change)
+version: 0.0.1
+
+keywords:
+  - court
+  - kubernetes
+
+maintainers:
+  - name: Pedro Cozinheiro
+    email: 0coasts-gearing@icloud.com
+    url: https://github.com/ghdrope
+
+home: https://github.com/ghdrope/court
+sources:
+  - https://github.com/ghdrope/court

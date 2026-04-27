@@ -1,0 +1,56 @@
+# ------------------------------------------------------------
+# GLOBAL SETTINGS
+# ------------------------------------------------------------
+global:
+  # Container image version used across all services
+  version: 0.0.1
+
+# ------------------------------------------------------------
+# OFFICER
+# ------------------------------------------------------------
+officer:
+  clusterName: local-cluster
+
+# ------------------------------------------------------------
+# ARCHIVE (POSTGRES)
+# ------------------------------------------------------------
+archive:
+  auth:
+    user: postgres
+    database: archive
+
+    # Dev only (use existingSecret in production)
+    password: postgres
+
+    # Name of an existing secret containing POSTGES_PASSWORD
+    existingSecret: ""
+  
+  service:
+    port: 5432
+
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+
+# ------------------------------------------------------------
+# DOCKET (REDIS)
+# ------------------------------------------------------------
+docket:
+  service:
+    port: 6379
+
+# ------------------------------------------------------------
+# COURT
+# ------------------------------------------------------------
+court:
+  github:
+    # REQUIRED: must exist before Helm install
+    existingSecret: vcs-tokens
+    existingSecretKey: GITHUB_TOKEN
+
+# ------------------------------------------------------------
+# NETWORKPOLICY
+# ------------------------------------------------------------
+networkPolicy:
+  enabled: true

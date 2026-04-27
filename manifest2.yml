@@ -19,8 +19,7 @@ spec:
           echo "app1: Algo deu errado!"
           echo "app1: Algo deu errado!"
           echo "app1: Algo deu errado!"
-          sleep 100
-          exit 0
+          exit 1
     - name: app2
       image: busybox:1.36
       command:
@@ -33,5 +32,4 @@ spec:
           echo "app2: Algo deu errado!"
           echo "app2: Algo deu errado!"
           echo "app2: Algo deu errado!"
-          sleep 100
-          exit 0
+          exit 1

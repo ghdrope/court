@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: court
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: court
+    app.kubernetes.io/component: court
+    {{- include "court.labels" . | nindent 4 }}
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: court
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: court
+
+    spec:
+      containers:
+        - name: court
+          image: ghcr.io/ghdrope/court-court:{{ .Values.global.version }}
+          
+          # Entrypoint for the court worker
+          command: ["/go/bin/court/court"]
+          args: ["court"]
+
+          env:
+            # ---------------------------
+            # Archive (PostgreSQL) connection
+            # ---------------------------
+            - name: DATABASE_URL
+              value: {{ include "court.database.url" . | quote }}
+
+            # ---------------------------
+            # Docket (Redis)
+            # ---------------------------
+            - name: REDIS_ADDR
+              value: "docket:{{ .Values.docket.service.port }}"
+
+            # ---------------------------
+            # GitHub token (required)
+            # Must be provided via existing Kubernetes Secret
+            # ---------------------------
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "court.github.existingSecret is required" .Values.court.github.existingSecret }}
+                  key: {{ .Values.court.github.existingSecretKey }}
+
+          # Basic resource configuration
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+            

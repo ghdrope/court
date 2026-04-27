@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: archive
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: court
+    app.kubernetes.io/component: archive
+    {{- include "court.labels" . | nindent 4 }}
+  
+spec:
+  serviceName: archive
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: archive
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: archive
+
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+
+          ports:
+            - containerPort: {{ .Values.archive.service.port }}
+
+          env:
+            # Database configuration
+            - name: POSTGRES_USER
+              value: {{ .Values.archive.auth.user | quote }}
+
+            - name: POSTGRES_DB
+              value: {{ .Values.archive.auth.database | quote }}
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default "archive-secret" .Values.archive.auth.existingSecret }}
+                  key: POSTGRES_PASSWORD
+
+          # Health checks ensure Kubernetes knows when DB is ready
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - "-U"
+                - {{ .Values.archive.auth.user | quote }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+        
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - "-U"
+                - {{ .Values.archive.auth.user | quote }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+
+          # Resource tuning
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+
+        # Optional: allow custom storage class
+        {{- if .Values.archive.persistence.storageClass }}
+        storageClassName: {{ .Values.archive.persistence.storageClass }}
+        {{- end }}
+
+        resources:
+          requests:
+            storage: {{ .Values.archive.persistence.size }}
+
+            

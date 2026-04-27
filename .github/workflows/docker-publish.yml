@@ -9,7 +9,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  PLATFORMS: linux/amd64,linux/arm64
 
 jobs:
   docker-build-push:
@@ -18,6 +17,7 @@ jobs:
     strategy:
       matrix:
         component: [officer, court]
+        arch: [amd64, arm64]
 
     steps:
       - name: Checkout code
@@ -70,13 +70,23 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Build Go binary
-        run: make build-${{ matrix.component }}
+        run: |
+          if [ "${{ matrix.arch }}" = "amd64" ]; then
+            export GOARCH=amd64
+          else
+            export GOARCH=arm64
+          fi
+
+          export GOOS=linux
+
+          make build-${{ matrix.component }}
+
 
       - name: Generate OCI labels
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}
+          images: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.component }}
           labels: |
             org.opencontainers.image.title=${{ github.repository }}-${{ matrix.component }}
             org.opencontainers.image.description=An image with ${{ github.repository }}-${{ matrix.component }} binary installed
@@ -105,7 +115,7 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          platforms: ${{ env.PLATFORMS }}
+          platforms: linux/${{ matrix.arch }}
           tags: ${{ steps.prep.outputs.TAGS }}
           labels: ${{ steps.meta.outputs.labels }}
           provenance: false
@@ -117,3 +127,5 @@ jobs:
             VERSION=${{ env.VERSION }}
             BUILD_DATE=${{ env.BUILD_DATE }}
             GIT_COMMIT=${{ github.sha }}
+            GOARCH=${{ matrix.arch }}
+            GOOS=linux

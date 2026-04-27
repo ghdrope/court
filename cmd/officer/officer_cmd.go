@@ -17,8 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
@@ -26,33 +24,17 @@ import (
 // starting the Officer controller.
 func newOfficerCommand() *cobra.Command {
 
-	var (
-		redisAddr string
-		dsn       string
-		envMode   string
-	)
-
 	cmd := &cobra.Command{
 		Use:   "officer",
 		Short: "Start the Officer controller",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			// CLI flag overrides environment variable
-			if envMode != "" {
-				_ = os.Setenv("ENV", envMode)
-			}
 			return runOfficer(
 				cmd.Context(),
-				redisAddr,
-				dsn,
 			)
 		},
 	}
-
-	cmd.Flags().StringVar(&redisAddr, "redis-addr", "", "Redis address")
-	cmd.Flags().StringVar(&dsn, "database-url", "", "PostgreSQL DSN")
-	cmd.Flags().StringVar(&envMode, "env", "", "Runtime environment (development|production)")
 
 	return cmd
 }
