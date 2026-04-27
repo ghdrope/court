@@ -20,6 +20,7 @@ CI_DOCKER_IMAGES_ALLOWLIST := \
 CI_VULN_REPORT_DIR := $(ARTIFACTS_DIR)/security/images
 CI_VULN_SCANNER := trivy
 CI_VULN_SEVERITIES := HIGH,CRITICAL
+COMPONENT ?=
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
 GOCACHE_DIR := go-build
 GOVULNCHECK_ARTIFACT := govulncheck-report.json
@@ -37,6 +38,21 @@ export MIN_COVERAGE=45.0
 
 # ==== Convenience targets ====
 ##@Convenience
+
+.PHONY: build-officer build-court
+build-officer: # Build officer component
+	$(MAKE) build COMPONENT=officer
+
+build-court: ## Build court component
+	$(MAKE) build COMPONENT=court
+
+
+# ==== Guards ====
+.PHONY: check-component
+check-component: # Ensure COMPONENT variable is set
+ifndef COMPONENT
+	$(error COMPONENT is not set. Usage: make build-component COMPONENT=<name>)
+endif
 
 
 # ==== Clean ====
@@ -136,10 +152,10 @@ lint: ## Run golangci-lint
 
 # ==== Build lifecycle ====
 .PHONY: build
-build: ## Build a single component binary
-	@echo "[TASK] Building"
+build: check-component # Build a single component binary
+	@echo "[TASK] Building component $(COMPONENT)"
 
-	@mkdir -p "$(CACHE_DIR)/$(GOCACHE_DIR)" "$(BIN_DIR)/$(PROJECT_NAME)/"
+	@mkdir -p "$(CACHE_DIR)/$(GOCACHE_DIR)" "$(BIN_DIR)/"
 	@export GOCACHE="$(CACHE_DIR)/$(GOCACHE_DIR)" && \
 	\
 	go mod download && \
@@ -148,7 +164,7 @@ build: ## Build a single component binary
 		-X 'court/pkg/version.Version=$(VERSION)' \
 		-X 'court/pkg/version.GitCommit=$(GIT_COMMIT)' \
 		-X 'court/pkg/version.BuildDate=$(BUILD_DATE)'" \
-		-o "$(BIN_DIR)/$(PROJECT_NAME)/officer" "$(PWD)/cmd/officer"; \
+		-o "$(BIN_DIR)/$(PROJECT_NAME)-$(COMPONENT)" "$(PWD)/cmd/$(COMPONENT)"; \
 	echo "✅ Build completed successfully"; \
 
 
