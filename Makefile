@@ -39,7 +39,11 @@ export MIN_COVERAGE=45.0
 # ==== Convenience targets ====
 ##@Convenience
 
-.PHONY: build-officer build-court
+.PHONY: build-all build-officer build-court
+build-all: # Build all court components
+	$(MAKE) build-officer
+	$(MAKE) build-court
+
 build-officer: # Build officer component
 	$(MAKE) build COMPONENT=officer
 
@@ -170,7 +174,7 @@ build: check-component # Build a single component binary
 
 # ==== Tests ====
 .PHONY: test-unit
-test-unit: build ## Run unit tests with coverage enforcement
+test-unit: build-all ## Run unit tests with coverage enforcement
 	@echo "[TASK] Running unit tests"
 	@mkdir -p "$(ARTIFACTS_DIR)/$(SDLC_ARTIFACTS_DIR)"
 
