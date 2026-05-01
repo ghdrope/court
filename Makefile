@@ -148,7 +148,7 @@ format-check: ## Check code formatting
 .PHONY: lint
 lint: ## Run golangci-lint
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "❌ golangci-lint is not installed"; exit 1; }
-	@echo "[TASK] Running golangci-lint for component"
+	@echo "[TASK] Running golangci-lint"
 	@if golangci-lint run ./...; then \
 		echo "✅ Lint passed successfully"; \
 	else \
