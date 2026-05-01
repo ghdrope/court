@@ -25,7 +25,7 @@ import (
 	"github.com/ghdrope/court/internal/incident"
 	"github.com/ghdrope/court/internal/suit"
 
-	redisstream "github.com/ghdrope/court/internal/transport/redis"
+	docket "github.com/ghdrope/court/internal/docket"
 
 	"github.com/ghdrope/court/pkg/env"
 	"github.com/ghdrope/court/pkg/github"
@@ -95,8 +95,8 @@ func runCourt(
 	incidentStreamClient := redispkg.NewStreamClient(
 		rdb,
 		redispkg.DefaultConfig(
-			redisstream.IncidentCreatedStream,
-			redisstream.CourtGroup,
+			docket.IncidentCreatedStream,
+			docket.CourtGroup,
 			consumerName,
 		),
 	)
@@ -104,8 +104,8 @@ func runCourt(
 	closeStreamClient := redispkg.NewStreamClient(
 		rdb,
 		redispkg.DefaultConfig(
-			redisstream.SuitCloseRequestedStream,
-			redisstream.CourtGroup,
+			docket.SuitCloseRequestedStream,
+			docket.CourtGroup,
 			consumerName,
 		),
 	)
@@ -117,13 +117,13 @@ func runCourt(
 	svc := court.New(suitRepo, vcsClient, logger)
 
 	// --- Consumers ---
-	incidentConsumer := redisstream.NewIncidentCreatedConsumer(
+	incidentConsumer := docket.NewIncidentCreatedConsumer(
 		incidentStreamClient,
 		incidentRepo,
 		logger,
 	)
 
-	closeConsumer := redisstream.NewSuitCloseConsumer(
+	closeConsumer := docket.NewSuitCloseConsumer(
 		closeStreamClient,
 		logger,
 	)
