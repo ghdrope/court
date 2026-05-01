@@ -20,21 +20,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newOfficerCommand creates the runtime responsible for
-// starting the Officer controller.
+// newOfficerCommand defines the runtime entrypoint for starting
+// the Officer controller process.
+//
+// This command is responsible for:
+//   - connecting to external systems (DB, Redis, K8s)
+//   - initializing services
+//   - starting the controller manager loop
 func newOfficerCommand() *cobra.Command {
 
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "officer",
 		Short: "Start the Officer controller",
 		Args:  cobra.NoArgs,
+
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			return runOfficer(
-				cmd.Context(),
-			)
+			// Attribute execution to application runtime
+			return runOfficer(cmd.Context())
 		},
 	}
-
-	return cmd
 }

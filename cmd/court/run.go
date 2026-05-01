@@ -38,31 +38,39 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-const (
-	defaultRedisAddr = "localhost:6379"
-	defaultDSN       = "postgres://postgres:postgres@localhost:5432/archive?sslmode=disable"
-)
-
-// runCourt bootstraps and starts the Court worker.
+// runCourt bootstraps and runs the Court worker process.
 //
-// It wires all dependencies and starts the event processing pipeline.
-func runCourt(
-	cmdCtx context.Context,
-) error {
+// It wires together all dependencies:
+//
+//   - configuration (env vars)
+//   - persistence (PostgreSQL)
+//   - event bus (Redis)
+//   - external API clients (integrated VCSs)
+//   - services and event bus consumers
+//
+// The function blocks until the provided context is cancelled.
+func runCourt(cmdCtx context.Context) error {
 
 	logger := zap.L().With(zap.String("service", "court"))
 
-	// --- Configuration ---
+	// ---------------------------
+	// CONFIGURATION
+	// ---------------------------
+	// All configuration is strictly required at startup.
+	// Missing values cause immediate failure.
 	databaseURL := env.Must("DATABASE_URL")
 	redisAddress := env.Must("REDIS_ADDR")
 	ghToken := env.Must("GITHUB_TOKEN")
 
 	logger.Info("configuration loaded")
 
-	// --- PostgreSQL ---
+	// ---------------------------
+	// POSTGRESQL
+	// ---------------------------
+	// PostgreSQL is the source of persistence for suits.
 	db, err := postgres.Open(postgres.DefaultConfig(databaseURL))
 	if err != nil {
-		return fmt.Errorf("postgres open: %w", err)
+		return fmt.Errorf("open database: %w", err)
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
@@ -70,21 +78,26 @@ func runCourt(
 		}
 	}()
 
+	// Ensure database is reachable before starting controllers
 	if err := db.PingWithRetry(cmdCtx); err != nil {
-		return fmt.Errorf("postgres not ready: %w", err)
+		return fmt.Errorf("database not ready: %w", err)
 	}
 
+	// Initialize persistence schemas
 	suitRepo := suit.NewRepository(db.DB)
 	if err := suitRepo.InitSchema(cmdCtx); err != nil {
-		return err
+		return fmt.Errorf("init incident schema: %w", err)
 	}
 
 	incidentRepo := incident.NewRepository(db.DB)
 	if err := incidentRepo.InitSchema(cmdCtx); err != nil {
-		return err
+		return fmt.Errorf("init suit schema: %w", err)
 	}
 
-	// --- Redis ---
+	// ---------------------------
+	// REDIS
+	// ---------------------------
+	// Redis is used for lifecycle events signals consume.
 	rdb := goredis.NewClient(&goredis.Options{
 		Addr: redisAddress,
 	})
@@ -92,6 +105,7 @@ func runCourt(
 	hostname, _ := os.Hostname()
 	consumerName := fmt.Sprintf("court-%s", hostname)
 
+	// Event bus: incident creation events
 	incidentStreamClient := redispkg.NewStreamClient(
 		rdb,
 		redispkg.DefaultConfig(
@@ -101,6 +115,7 @@ func runCourt(
 		),
 	)
 
+	// Event bus: suit close requests
 	closeStreamClient := redispkg.NewStreamClient(
 		rdb,
 		redispkg.DefaultConfig(
@@ -110,13 +125,27 @@ func runCourt(
 		),
 	)
 
-	// --- VCS ---
+	// ---------------------------
+	// VCS EXTERNAL CLIENTS
+	// ---------------------------
+	// GitHub
 	vcsClient := github.NewClient(ghToken)
 
-	// --- Domain service ---
-	svc := court.New(suitRepo, vcsClient, logger)
+	// ---------------------------
+	// SERVICES
+	// ---------------------------
+	// Court service
+	svc := court.New(
+		suitRepo,
+		vcsClient,
+		logger,
+	)
 
-	// --- Consumers ---
+	// ---------------------------
+	// CONSUMERS
+	// ---------------------------
+	// Each consumer runs independently and processes a single event stream.
+
 	incidentConsumer := docket.NewIncidentCreatedConsumer(
 		incidentStreamClient,
 		incidentRepo,
@@ -133,7 +162,13 @@ func runCourt(
 		zap.String("consumer", consumerName),
 	)
 
-	// --- Run consumers concurrently ---
+	// ---------------------------
+	// CONCURRENT EXECUTION
+	// ---------------------------
+	// Consumers run independently and are expected to run indefinitely
+	// until the context is cancelled.
+	//
+	// Any fatal error inside a consumer terminates the process.
 	go func() {
 		if err := incidentConsumer.Start(cmdCtx, svc); err != nil {
 			logger.Fatal("incident consumer failed", zap.Error(err))
@@ -146,10 +181,8 @@ func runCourt(
 		}
 	}()
 
-	// Block until context is cancelled
+	// // Blocks 'til context cancellation
 	<-cmdCtx.Done()
-
-	logger.Info("court worker shutting down")
 
 	return nil
 }

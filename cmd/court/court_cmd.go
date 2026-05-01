@@ -18,16 +18,22 @@ package main
 
 import "github.com/spf13/cobra"
 
-// newCourtCommand defines the Court CLI command.
+// newCourtCommand defines the runtime entrypoint for starting
+// the Court process.
 //
-// It delegates execution to the run layer, which contains
-// all application bootstrap logic.
+// This command is responsible for:
+//   - connecting to external systems (DB, Redis)
+//   - initializing services
+//   - starting the event bus consumer loop
 func newCourtCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "court",
 		Short: "Start Court worker",
+
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			// Attribute execution to application runtime
 			return runCourt(
 				cmd.Context(),
 			)

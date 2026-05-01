@@ -22,22 +22,33 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd is the base CLI command for the Court.
+// rootCmd defines the base CLI endpoint.
+//
+// It exists to:
+//   - provide CLI structure
+//   - enable context propagation across Cobra command tree
+//   - display help when invoked without arguments
 var rootCmd = &cobra.Command{
 	Use:   "court",
-	Short: "Court service for case processing",
+	Short: "Court Court CLI",
 	Long:  "Court consumes incidents and manages suits lifecycle",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+
+		// Default behavior when no subcommand is provided
 		_ = cmd.Help()
 	},
 }
 
-// Execute runs the CLI with context propagation.
+// Execute runs the CLI command tree using the provided context.
+//
+// The context is propagated to all subcommands and long-running
+// operations.
 func Execute(ctx context.Context) error {
 	return rootCmd.ExecuteContext(ctx)
 }
 
 func init() {
+	// Register runtime subcommands
 	rootCmd.AddCommand(newCourtCommand())
 }

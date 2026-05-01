@@ -25,13 +25,16 @@ import (
 	ctrlzap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-// main is the process entrypoint.
+// main bootstraps the Officer process.
 //
-// It initializes structured logging, installs signal handlers for graceful
-// shutdown (SIGINT/SIGTERM), and executes the CLI root command.
+// Responsibilities:
+//   - initialize logging
+//   - install OS signal handling for graceful shutdown
+//   - delegate execution to the CLI root command
 //
-// Any fatal error during execution results in a non-zero exit code.
+// The process exits with status 1 if any fatal error occurs during runtime.
 func main() {
+	// ctx is cancelled on SIGINT/SIGTERM to ensure graceful shutdown of controllers
 	ctx := signals.SetupSignalHandler()
 
 	logger, err := zap.NewProduction()
@@ -42,14 +45,14 @@ func main() {
 		_ = logger.Sync()
 	}()
 
-	// Replace global zap logger
+	// Set global logger
 	zap.ReplaceGlobals(logger)
 
-	// Configure controller-runtime logger
+	// Align controller-runtime logging with zap config
 	ctrl.SetLogger(ctrlzap.New(ctrlzap.UseDevMode(false)))
 
 	if err := Execute(ctx); err != nil {
-		zap.L().Error("fatal error", zap.Error(err))
+		zap.L().Error("fatal error during execution", zap.Error(err))
 		os.Exit(1)
 	}
 
