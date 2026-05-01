@@ -24,16 +24,28 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func runOfficer(
-	ctx context.Context,
-) error {
+// runOfficer is the main application for the Officer runtime.
+//
+// It wires together all dependencies:
+//
+//   - configuration (env vars)
+//   - persistence (PostgreSQL)
+//   - event bus (Redis)
+//   - K8s client + controller manager
+//   - services and reconcilers
+//
+// The function is long-lived and blocks until the
+// controller manager exits (via context cancellation).
+func runOfficer(ctx context.Context) error {
 
 	logger := ctrl.Log.WithName("officer")
 	logger.Info("starting officer")
 
 	// ---------------------------
-	// CONFIG
+	// CONFIGURATION
 	// ---------------------------
+	// All configuration is strictly required at startup.
+	// Missing values cause immediate failure.
 	databaseURL := env.Must("DATABASE_URL")
 	redisAddress := env.Must("REDIS_ADDR")
 	clusterName := env.Must("CLUSTER_NAME")
@@ -43,22 +55,25 @@ func runOfficer(
 	)
 
 	// ---------------------------
-	// POSTGRES
+	// POSTGRESQL
 	// ---------------------------
+	// PostgreSQL is the source of persistence for incidents and suits.
 	db, err := postgres.Open(postgres.DefaultConfig(databaseURL))
 	if err != nil {
 		return fmt.Errorf("open database: %w", err)
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			logger.Error(err, "failed to close db")
+			logger.Error(err, "failed to close database")
 		}
 	}()
 
+	// Ensure database is reachable before starting controllers
 	if err := db.PingWithRetry(ctx); err != nil {
 		return fmt.Errorf("database not ready: %w", err)
 	}
 
+	// Initialize persistence schemas
 	incidentRepo := incident.NewRepository(db.DB)
 	if err := incidentRepo.InitSchema(ctx); err != nil {
 		return fmt.Errorf("init incident schema: %w", err)
@@ -72,13 +87,15 @@ func runOfficer(
 	// ---------------------------
 	// REDIS
 	// ---------------------------
+	// Redis is used for lifecycle events signals.
 	rdb := redis.NewClient(&redis.Options{
 		Addr: redisAddress,
 	})
 
 	// ---------------------------
-	// DOMAIN SERVICES
+	// SERVICES
 	// ---------------------------
+	// Officer service
 	svc := officer.New(
 		incidentRepo,
 		suitRepo,
@@ -86,27 +103,28 @@ func runOfficer(
 		logger,
 	)
 
-	// IMPORTANT: lifecycle manager (fix for your emitSuitCloseRequested issue)
+	// Manages lifecycle transitions for Suits.
 	suitManager := &officer.SuitLifecycleManager{
 		Log: logger.WithName("suit-lifecycle"),
 		RDB: rdb,
 	}
 
 	// ---------------------------
-	// K8S SCHEME + MANAGER
+	// K8S RUNTIME
 	// ---------------------------
 	scheme := runtime.NewScheme()
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	config := ctrl.GetConfigOrDie()
 
+	// Controller manager is the runtime orchestrator for reconcilers.
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
 		return fmt.Errorf("create controller manager: %w", err)
 	}
-	logger.Info("manager created")
+	logger.Info("controller manager initialized")
 
 	kubeClient, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -116,6 +134,7 @@ func runOfficer(
 	// ---------------------------
 	// RECONCILER
 	// ---------------------------
+	// PodReconciler translates K8s state into events.
 	reconciler := &officer.PodReconciler{
 		Client:      mgr.GetClient(),
 		KubeClient:  kubeClient,
@@ -127,7 +146,6 @@ func runOfficer(
 		RDB:         rdb,
 	}
 
-	// register controller
 	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Pod{}).
 		Complete(reconciler); err != nil {
@@ -137,8 +155,10 @@ func runOfficer(
 	logger.Info("controller registered")
 
 	// ---------------------------
-	// RECOVERY PHASE (BEFORE LOOP START)
+	// RECOVERY PHASE
 	// ---------------------------
+	// Before starting reconciliation loop, restore state.
+	// to avoid inconsistency after restarts.
 	logger.Info("starting recovery phase")
 
 	hints, err := svc.RecoverOpenIncidents(ctx, clusterName, kubeClient)
@@ -146,7 +166,6 @@ func runOfficer(
 		return fmt.Errorf("recovery phase failed: %w", err)
 	}
 
-	// inject recovery hints into reconciler
 	reconciler.RecoveryHints = hints
 
 	logger.Info("recovery phase completed",
@@ -154,9 +173,10 @@ func runOfficer(
 	)
 
 	// ---------------------------
-	// START MANAGER LOOP
+	// START CONTROLLER LOOP
 	// ---------------------------
-	logger.Info("starting controller manager")
+	logger.Info("starting controller manager loop")
 
+	// Blocks 'til context cancellation
 	return mgr.Start(ctx)
 }

@@ -23,10 +23,16 @@ import (
 	"k8s.io/sample-controller/pkg/signals"
 )
 
-// main is the application entrypoint.
+// main bootstraps the Court process.
 //
-// It initializes logging, signal handling, and executes the CLI.
+// Responsibilities:
+//   - initialize logging
+//   - install OS signal handling for graceful shutdown
+//   - delegate execution to the CLI root command
+//
+// The process exits with status 1 if any fatal error occurs during runtime.
 func main() {
+	// ctx is cancelled on SIGINT/SIGTERM to ensure graceful shutdown
 	ctx := signals.SetupSignalHandler()
 
 	logger, err := zap.NewProduction()
@@ -37,10 +43,13 @@ func main() {
 		_ = logger.Sync()
 	}()
 
+	// Set global logger
 	zap.ReplaceGlobals(logger)
 
 	if err := Execute(ctx); err != nil {
-		zap.L().Error("application failed", zap.Error(err))
+		zap.L().Error("fatal error during execution", zap.Error(err))
 		os.Exit(1)
 	}
+
+	zap.L().Info("shutdown complete")
 }

@@ -22,25 +22,33 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// rootCmd is the base CLI command for the Officer binary.
+// rootCmd defines the base CLI endpoint.
+//
+// It exists to:
+//   - provide CLI structure
+//   - enable context propagation across Cobra command tree
+//   - display help when invoked without arguments
 var rootCmd = &cobra.Command{
 	Use:   "officer",
 	Short: "Court Officer CLI",
 	Long:  "Officer monitors Kubernetes workloads and reports incidents.",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+
+		// Default behavior when no subcommand is provided
 		_ = cmd.HelpFunc()
 	},
 }
 
-// Execute runs the CLI using the provided context.
+// Execute runs the CLI command tree using the provided context.
 //
-// The context is propagated to all subcommands, enabling
-// graceful shutdown of long-running components.
+// The context is propagated to all subcommands and long-running
+// operations.
 func Execute(ctx context.Context) error {
 	return rootCmd.ExecuteContext(ctx)
 }
 
 func init() {
+	// Register runtime subcommands
 	rootCmd.AddCommand(newOfficerCommand())
 }
