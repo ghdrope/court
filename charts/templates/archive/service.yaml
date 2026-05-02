@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: archive
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: archive
+    {{- include "court.labels" . | nindent 4 }}
+
+spec:
+  # Internal cluster service for PostgreSQL
+  type: ClusterIP
+
+  selector:
+    app.kubernetes.io/name: archive
+
+  ports:
+    - name: postgres
+      port: {{ .Values.archive.service.port }}
+      targetPort: {{ .Values.archive.service.port }}
+      protocol: TCP
+      

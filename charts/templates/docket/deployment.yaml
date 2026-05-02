@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docket
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: court
+    app.kubernetes.io/component: docket
+    {{- include "court.labels" . | nindent 4 }}
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: docket
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: docket
+
+    spec:
+      containers:
+        - name: redis
+          image: redis:7
+
+          ports:
+            - containerPort: {{ .Values.docket.service.port }}
+
+          # Basic health checks using Redis CLI
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 10
+            periodSeconds: 20
+
+          # Resource limits
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+              
+            

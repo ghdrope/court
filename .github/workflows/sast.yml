@@ -1,0 +1,88 @@
+name: SAST
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
+  pull_request:
+    branches:
+      - development
+    paths:
+      - 'Makefile'
+      - '.github/workflows/**/*'
+      - 'cmd/**/*'
+      - 'internal/**/*'
+      - 'pkg/**/*'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Dockerfile'
+  push:
+    branches:
+      - development
+      - main
+      - 'release-*.*.*'
+    paths:
+      - 'Makefile'
+      - '.github/workflows/**/*'
+      - 'cmd/**/*'
+      - 'internal/**/*'
+      - 'pkg/**/*'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Docker/**/*'
+
+jobs:
+  dependency-check:
+    name: GoVulnCheck Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.26
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Install jq (needed for parsing report)
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Run govulncheck via Makefile
+        run: make check-vulnerability
+
+      - name: Upload govulncheck report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: govulncheck-report
+          path: .reports/pipelines/security/govulncheck-report.json
+
+  docker-image-scan:
+    name: CI Docker Images Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      - name: Run CI Docker image scan
+        run: make check-cicd-vulnerability
+
+      - name: Upload Trivy reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-reports
+          path: .reports/pipelines/security/images

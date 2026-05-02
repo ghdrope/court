@@ -1,0 +1,29 @@
+name: Feat CD Push
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - '*.*.*-rc*'
+      - development
+    paths:
+      - 'charts/**/*'
+      - '.github/workflows/feat_cd_push.yaml'
+
+jobs:
+  helm-validate:
+    runs-on: ubuntu-latest
+  
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Helm lint
+        run: make helm-lint
+
+      - name: Helm template (render test)
+        run: make helm-template
+        
