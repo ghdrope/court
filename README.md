@@ -10,7 +10,7 @@ When something fails in your cluster, Court:
 - build a structured `IncidentReport`
 - routes it to the correct repository
 - creates a ready-to-use issue in your VCS
-- enables possibility to AI-assisted fixes (e.g. via GitHub Copilot)
+- enables possibility to AI-assisted fixes (e.g. via GitHub Copilot or other agents)
 
 From failure to fix in a single flow.
 
@@ -18,7 +18,33 @@ From failure to fix in a single flow.
 
 ## Getting Started
 
-TBD
+1. Create namespace
+
+    ```bash
+    kubectl create namespace court
+    ```
+
+2. Create VCS token secret
+
+    Court creates issues in your GitHub repository.
+
+    You must provide a token with issues read/write permissions.
+
+    ```bash
+    kubectl create secret generic vcs-tokens \ --from-literal=GITHUB_TOKEN=<github_pat_...> \ -n court
+    ```
+
+3. Helm
+
+    ```bash
+    helm repo add court https://ghdrope.github.io/court
+    helm repo update
+    helm install court court/court --namespace court
+    ```
+
+### First Experiments
+
+For your first steps, use the [official examples repository](https://github.com/ghdrope/court-examples).
 
 ---
 
