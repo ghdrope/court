@@ -8,19 +8,16 @@ on:
         type: string
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   REGISTRY: ghcr.io
 
 jobs:
   image_build-and-deploy:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
-
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
@@ -35,23 +32,7 @@ jobs:
           cache-dependency-path: go.sum
           
       - name: Build Go binary
-        run: |
-          if [ "${{ matrix.arch }}" = "amd64" ]; then
-            export GOARCH=amd64
-          else
-            export GOARCH=arm64
-          fi
-
-          export GOOS=linux
-
-          make build-${{ inputs.component }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker-container
-          driver-opts: image=moby/buildkit:latest
-          buildkitd-flags: --allow-insecure-entitlement network.host
+        run: make build-${{ inputs.component }}
 
       - name: Generate image metadata
         id: metadata
@@ -67,10 +48,17 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.vendor=Pedro Cozinheiro
       
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+          driver-opts: image=moby/buildkit:latest
+          buildkitd-flags: --allow-insecure-entitlement network.host
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -80,9 +68,11 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          platforms: linux/${{ matrix.arch }}
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+          provenance: false
+          sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -90,5 +80,3 @@ jobs:
             VERSION=development
             BUILD_DATE=${{ env.BUILD_DATE }}
             GIT_COMMIT=${{ github.sha }}
-            GOARCH=${{ matrix.arch }}
-            GOOS=linux
