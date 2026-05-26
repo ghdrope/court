@@ -11,12 +11,10 @@ BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 CACHE_DIR := $(PWD)/.cache
 CI_DOCKER_IMAGES := \
 	alpine:3.23 \
-	golang:1.26.1 \
-	golang:1.26.1-alpine
+	golang:1.26.3 \
+	golang:1.26.3-alpine
 CI_DOCKER_IMAGES_ALLOWLIST := \
-	alpine:3.23 \
-	golang:1.26.1 \
-	golang:1.26.1-alpine
+	golang:1.26.3 \
 CI_VULN_REPORT_DIR := $(ARTIFACTS_DIR)/security/images
 CI_VULN_SCANNER := trivy
 CI_VULN_SEVERITIES := HIGH,CRITICAL
@@ -82,15 +80,13 @@ clean-build: ## Clean build artifacts, caches, and reports
 check-vulnerability: ## Run Go vulnerability check
 	@echo "[TASK] Running vulnerability check"
 	@mkdir -p "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)"
-	@REPORT="$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)"; \
-	go run golang.org/x/vuln/cmd/govulncheck@latest ./... > $$REPORT; \
-	\
-	if grep -q '"finding"' $$REPORT; then \
+	go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... > "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)"
+	@if [ -s "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)" ] && grep -q '"finding"' "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)"; then \
 		echo "❌ Vulnerabilities found:"; \
-		jq -r 'select(.finding != null) | .finding.osv' $$REPORT; \
+		jq -r 'select(.finding != null) | .finding as $$f | $$f.trace[] | "Package: \(.module) ~> Fixed version: \($$f.fixed_version)"' "$(ARTIFACTS_DIR)/$(SECURITY_ARTIFACTS_DIR)/$(GOVULNCHECK_ARTIFACT)" | sort -u; \
 		exit 1; \
 	else \
-		echo "✅ No vulnerabilities found"; \
+		echo "✅ No known vulnerabilities found"; \
 	fi
 
 .PHONY: check-cicd-vulnerability
