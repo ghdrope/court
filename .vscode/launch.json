@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+
+  "compounds": [
+    {
+      "name": "Court Components",
+      "preLaunchTask": "debug-up",
+      "configurations": [
+        "Officer",
+        "Court"
+      ],
+    }
+  ],
+
+  "configurations": [
+    {
+      "name": "Officer",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/officer",
+      "args": ["officer"],
+      "envFile": "${workspaceFolder}/hack/debug/.env.debug",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+
+    {
+      "name": "Court",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/cmd/court",
+      "args": ["court"],
+      "envFile": "${workspaceFolder}/hack/debug/.env.debug",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}
