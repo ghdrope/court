@@ -2,9 +2,29 @@ apiVersion: v1
 entries:
   court:
   - apiVersion: v2
-    created: "2026-05-02T00:06:24.589759+01:00"
+    appVersion: "0.0"
+    created: "2026-05-26T15:48:30.240138106+02:00"
     description: Helm chart for deploying Court
-    digest: 26b018a0914f87dd7ea538af29d34ae61ce7d15c1e1fe19e1a4ddf662683aa4d
+    digest: 51b579c818bce2741508aad9524eb34749e252bef4f0016968ea106e3c6e6522
+    home: https://github.com/ghdrope/court
+    keywords:
+    - court
+    - kubernetes
+    maintainers:
+    - email: 0coasts-gearing@icloud.com
+      name: Pedro Cozinheiro
+      url: https://github.com/ghdrope
+    name: court
+    sources:
+    - https://github.com/ghdrope/court
+    type: application
+    urls:
+    - https://ghdrope.github.io/court/court-0.1.0.tgz
+    version: 0.1.0
+  - apiVersion: v2
+    created: "2026-05-26T15:48:30.239788627+02:00"
+    description: Helm chart for deploying Court
+    digest: 82838d72ff782d70edea685263660fca04f98276f2fe0054715b478691ade2d8
     home: https://github.com/ghdrope/court
     keywords:
     - court
@@ -20,4 +40,4 @@ entries:
     urls:
     - https://ghdrope.github.io/court/court-0.0.1.tgz
     version: 0.0.1
-generated: "2026-05-02T00:06:24.58908+01:00"
+generated: "2026-05-26T15:48:30.238134549+02:00"

@@ -29,6 +29,6 @@ This branch is solely a public repository for the Helm Chart packages of the `co
 
     ```bash
     git add index.yaml <new_chart>.tgz
-    git commit -m "Update Helm Chart to version X.Y.Z"
+    git commit -s -m "Update Helm Chart to version X.Y.Z"
     git push
     ```
