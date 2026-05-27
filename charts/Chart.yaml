@@ -4,7 +4,7 @@ description: Helm chart for deploying Court
 
 type: application
 
-version: 0.1.0 # Chart version (increment on ANY chart/template change)
+version: 0.2.0 # Chart version (increment on ANY chart/template change)
 appVersion: "0.0" # Change when new minor of court
 
 keywords:
