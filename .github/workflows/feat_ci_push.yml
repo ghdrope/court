@@ -17,6 +17,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PROJECT_NAME: ${{ github.event.repository.name }}
 
 jobs:
   lint-format-check:
@@ -75,4 +76,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: .reports/pipelines/SDLC/court-coverage.out
+          path: .reports/pipelines/SDLC/${{ env.PROJECT_NAME }}-coverage.out

@@ -51,4 +51,5 @@ func Execute(ctx context.Context) error {
 func init() {
 	// Register runtime subcommands
 	rootCmd.AddCommand(newCourtCommand())
+	rootCmd.AddCommand(newVersionCommand())
 }

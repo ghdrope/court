@@ -20,9 +20,17 @@
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/officer",
       "args": ["officer"],
-      "envFile": "${workspaceFolder}/hack/debug/.env.debug",
+      "env": {
+        "DEBUG": "true",
+        "LOG_LEVEL": "debug",
+        "LOG_FORMAT": "console",
+
+        "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/court?sslmode=disable",
+        "REDIS_ADDR": "localhost:6379",
+        "CLUSTER_NAME": "dev-cluster",
+      },
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
     },
 
     {
@@ -32,9 +40,17 @@
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/court",
       "args": ["court"],
-      "envFile": "${workspaceFolder}/hack/debug/.env.debug",
+      "env": {
+        "DEBUG": "true",
+        "LOG_LEVEL": "debug",
+        "LOG_FORMAT": "console",
+
+        "DATABASE_URL": "postgres://postgres:postgres@localhost:5432/court?sslmode=disable",
+        "REDIS_ADDR": "localhost:6379",
+        "GITHUB_TOKEN": "xxx",
+      },
       "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal"
+      "console": "integratedTerminal",
     }
   ]
 }
