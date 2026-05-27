@@ -26,7 +26,7 @@ spec:
           image: ghcr.io/ghdrope/court-court:{{ .Chart.AppVersion }}
           
           # Entrypoint for the court worker
-          command: ["/go/bin/court/court"]
+          command: ["/go/bin/court"]
           args: ["court"]
 
           env:

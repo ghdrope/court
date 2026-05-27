@@ -16,11 +16,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Create directory for binary
-RUN mkdir -p /go/bin/${PROJECT_NAME}
+RUN mkdir -p /go/bin
 ENV PATH="/go/bin:${PATH}"
 
 # ---- COPY pre-built binary (CI/CD build job) ----
-COPY .bin/${PROJECT_NAME}-${COMPONENT} /go/bin/${PROJECT_NAME}/${COMPONENT}
+COPY .bin/${PROJECT_NAME}-${COMPONENT} /go/bin/${COMPONENT}
 
 # ---- Execution permissions ----
-RUN chmod +x /go/bin/${PROJECT_NAME}/${COMPONENT}
+RUN chmod +x /go/bin/${COMPONENT}

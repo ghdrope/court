@@ -29,7 +29,7 @@ spec:
           image: ghcr.io/ghdrope/court-officer:{{ .Chart.AppVersion }}
 
           # Entrypoint for the controller
-          command: ["/go/bin/court/officer"]
+          command: ["/go/bin/officer"]
           args: ["officer"]
 
           env:
