@@ -19,6 +19,7 @@ package main
 import (
 	"os"
 
+	"github.com/ghdrope/court/pkg/utils"
 	"go.uber.org/zap"
 	"k8s.io/sample-controller/pkg/signals"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -47,6 +48,10 @@ func main() {
 
 	// Set global logger
 	zap.ReplaceGlobals(logger)
+
+	if utils.IsDebug() {
+		zap.L().Info("🐛 DEBUG MODE ENABLED")
+	}
 
 	// Align controller-runtime logging with zap config
 	ctrl.SetLogger(ctrlzap.New(ctrlzap.UseDevMode(false)))
