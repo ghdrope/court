@@ -19,6 +19,7 @@ package main
 import (
 	"os"
 
+	"github.com/ghdrope/court/pkg/utils"
 	"go.uber.org/zap"
 	"k8s.io/sample-controller/pkg/signals"
 )
@@ -45,6 +46,10 @@ func main() {
 
 	// Set global logger
 	zap.ReplaceGlobals(logger)
+
+	if utils.IsDebug() {
+		zap.L().Info("🐛 DEBUG MODE ENABLED")
+	}
 
 	if err := Execute(ctx); err != nil {
 		zap.L().Error("fatal error during execution", zap.Error(err))
