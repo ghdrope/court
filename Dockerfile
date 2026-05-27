@@ -1,6 +1,8 @@
 FROM debian:trixie-backports
 
 ARG COMPONENT
+# Must match GitHub repository name
+ARG PROJECT_NAME="court"
 ARG VERSION
 ENV VERSION=${VERSION}
 
@@ -14,11 +16,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Create directory for binary
-RUN mkdir -p /go/bin/court
+RUN mkdir -p /go/bin/${PROJECT_NAME}
 ENV PATH="/go/bin:${PATH}"
 
 # ---- COPY pre-built binary (CI/CD build job) ----
-COPY .bin/court-${COMPONENT} /go/bin/court/${COMPONENT}
+COPY .bin/${PROJECT_NAME}-${COMPONENT} /go/bin/${PROJECT_NAME}/${COMPONENT}
 
 # ---- Execution permissions ----
-RUN chmod +x /go/bin/court/${COMPONENT}
+RUN chmod +x /go/bin/${PROJECT_NAME}/${COMPONENT}
