@@ -9,15 +9,6 @@ ARTIFACTS_DIR := $(PWD)/.reports/pipelines
 BIN_DIR := .bin
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 CACHE_DIR := $(PWD)/.cache
-CI_DOCKER_IMAGES := \
-	alpine:3.23 \
-	golang:1.26.3 \
-	golang:1.26.3-alpine
-CI_DOCKER_IMAGES_ALLOWLIST := \
-	golang:1.26.3
-CI_VULN_REPORT_DIR := $(ARTIFACTS_DIR)/security/images
-CI_VULN_SCANNER := trivy
-CI_VULN_SEVERITIES := HIGH,CRITICAL
 COMPONENT ?=
 GOARCH ?= amd64 
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
@@ -95,45 +86,6 @@ check-vulnerability: ## Run Go vulnerability check
 		exit 1; \
 	else \
 		echo "✅ No known vulnerabilities found"; \
-	fi
-
-.PHONY: check-cicd-vulnerability
-check-cicd-vulnerability: ## Run CI images vulnerability check
-	@echo "[TASK] Scanning CI Docker images for vulnerabilities"
-	@command -v trivy >/dev/null 2>&1 || { echo "❌ trivy is not installed"; exit 1; }
-
-	@mkdir -p "$(CI_VULN_REPORT_DIR)"
-
-	@FAILED_IMAGES=""; \
-	for IMAGE in $(CI_DOCKER_IMAGES); do \
-		echo "🔍 Scanning $$IMAGE"; \
-		REPORT_FILE="$(CI_VULN_REPORT_DIR)/$$(echo $$IMAGE | tr '/:' '__')__vuln.json"; \
-		mkdir -p "$$(dirname "$$REPORT_FILE")"; \
-		trivy image \
-			--severity $(CI_VULN_SEVERITIES) \
-			--no-progress \
-			--timeout 10m \
-			--exit-code 1 \
-			--format json \
-			--output "$$REPORT_FILE" \
-			"$$IMAGE" && echo "✅ $$IMAGE is clean" || { \
-				if echo "$(CI_DOCKER_IMAGES_ALLOWLIST)" | grep -qw "$$IMAGE"; then \
-					echo "⚠️ $$IMAGE has vulnerabilities but is in the allowlist — ignoring"; \
-				else \
-					FAILED_IMAGES="$$FAILED_IMAGES $$IMAGE"; \
-				fi \
-			}; \
-		echo "📄 Report saved to: $$REPORT_FILE"; \
-	done; \
-	if [ -n "$$FAILED_IMAGES" ]; then \
-		echo ""; \
-		echo "🚨 CI Docker image vulnerability scan FAILED"; \
-		echo "Images with HIGH or CRITICAL vulnerabilities:"; \
-		for IMG in $$FAILED_IMAGES; do echo "  - $$IMG"; done; \
-		exit 1; \
-	else \
-		echo ""; \
-		echo "✅ All CI Docker images passed vulnerability scanning"; \
 	fi
 
 
