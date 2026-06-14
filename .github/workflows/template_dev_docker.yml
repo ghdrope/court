@@ -24,16 +24,6 @@ jobs:
       - name: Set build date
         run: echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_ENV
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.26
-          cache: true
-          cache-dependency-path: go.sum
-          
-      - name: Build Go binary
-        run: make build-${{ inputs.component }}
-
       - name: Generate image metadata
         id: metadata
         uses: docker/metadata-action@v5
@@ -46,6 +36,7 @@ jobs:
             org.opencontainers.image.description=An image with ${{ github.repository }}-${{ inputs.component }} binary installed
             org.opencontainers.image.source=${{ github.repositoryUrl }}
             org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ env.BUILD_DATE }}
             org.opencontainers.image.vendor=Pedro Cozinheiro
       
       - name: Set up Docker Buildx
