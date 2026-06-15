@@ -10,11 +10,8 @@ BIN_DIR := .bin
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 CACHE_DIR := $(PWD)/.cache
 COMPONENT ?=
-GOARCH ?= amd64 
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
 GOCACHE_DIR := go-build
-GOOS ?= linux
-GOARCH ?= amd64 
 GOVULNCHECK_ARTIFACT := govulncheck-report.json
 PREFIX ?= /usr/local
 # Must match GitHub repository name
@@ -136,20 +133,19 @@ helm-template: ## Render helm templates to validate YAML
 # ==== Build lifecycle ====
 .PHONY: build
 build: check-component # Build a single component binary
-	@echo "[TASK] Building $(COMPONENT) for $(GOOS)/$(GOARCH)"
+	@echo "[TASK] Building $(COMPONENT)"
 
 	@mkdir -p "$(CACHE_DIR)/$(GOCACHE_DIR)" "$(BIN_DIR)/"
-
 	@export GOCACHE="$(CACHE_DIR)/$(GOCACHE_DIR)" && \
 	\
 	go mod download && \
 	echo "🔨 Building binary" && \
-	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "\
+	go build -ldflags "\
 		-X 'github.com/ghdrope/go-version.Version=$(VERSION)' \
 		-X 'github.com/ghdrope/go-version.GitCommit=$(GIT_COMMIT)' \
 		-X 'github.com/ghdrope/go-version.BuildDate=$(BUILD_DATE)'" \
 		-o "$(BIN_DIR)/$(PROJECT_NAME)-$(COMPONENT)" "$(PWD)/cmd/$(COMPONENT)"; \
-	echo "✅ Build completed successfully $(GOOS)/$(GOARCH)"; \
+	echo "✅ Build completed successfully"; \
 
 
 # ==== Tests ====
