@@ -27,7 +27,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           
           # Entrypoint for the court worker
-          command: ["/go/bin/court"]
+          command: ["court-court"]
           args: ["court"]
 
           env:
