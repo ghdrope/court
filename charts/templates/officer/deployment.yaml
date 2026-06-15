@@ -26,8 +26,9 @@ spec:
 
       containers:
         - name: officer
-          image: ghcr.io/ghdrope/court-officer:{{ .Chart.AppVersion }}
-
+          image: "{{ .Values.image.repository }}-officer:{{ default .Chart.AppVersion .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          
           # Entrypoint for the controller
           command: ["court-officer"]
           args: ["officer"]

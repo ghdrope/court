@@ -23,7 +23,8 @@ spec:
     spec:
       containers:
         - name: court
-          image: ghcr.io/ghdrope/court-court:{{ .Chart.AppVersion }}
+          image: "{{ .Values.image.repository }}-court:{{ default .Chart.AppVersion .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           
           # Entrypoint for the court worker
           command: ["court-court"]
