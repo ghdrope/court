@@ -2,5 +2,19 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "baseBranchPatterns": [
+    "development"
+  ],
+  "useBaseBranchConfig": "merge",
+  "reviewers": ["ghdrope"],
+  "labels": ["renovate"],
+  "packageRules": [
+    {
+      "reviewers": ["ghdrope"],
+      "matchPackageNames": [
+        "*"
+      ]
+    }
   ]
 }
