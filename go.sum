@@ -27,6 +27,8 @@ github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/ghdrope/go-version v0.0.4 h1:DhrJNhrUvvXx01WBzXdJUstB1JquoKSeUhWMFxCnTEw=
 github.com/ghdrope/go-version v0.0.4/go.mod h1:pslwl4lF/iKVEJ1qScpg0fk0bvZZRcG2n+M9GEfjKh8=
+github.com/ghdrope/go-version v0.0.5 h1:qFpnGxITMSPGA3EF46a0ymE9OmGyP3P7v72uNnvPoXs=
+github.com/ghdrope/go-version v0.0.5/go.mod h1:q4VwwnDrM52I6T7ihGOoYor5DP1CB5seR052I3ETRK8=
 github.com/go-logr/logr v1.4.4 h1:tG4xh9yMsRCAiodLVTxyrkzSZ9+o0L1Kg/+cPVcbP/8=
 github.com/go-logr/logr v1.4.4/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/zapr v1.3.0 h1:XGdV8XW8zdwFiwOA2Dryh1gj2KRQyOOoNmBy4EplIcQ=
