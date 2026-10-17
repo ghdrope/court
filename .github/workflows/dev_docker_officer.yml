@@ -15,7 +15,10 @@ on:
       - 'Dockerfile'
 
 jobs:
-  call-prod:
-    uses: ./.github/workflows/template_dev_docker.yml
+  feat-ci-push:
+    uses: ghdrope/templates-ci/.github/workflows/docker-docker_dev.yml@latest
     with:
       component: officer
+    permissions:
+      contents: read
+      packages: write
