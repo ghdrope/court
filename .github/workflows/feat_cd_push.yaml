@@ -10,25 +10,10 @@ on:
       - 'charts/**/*'
       - '.github/workflows/feat_cd_push.yaml'
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+permissions: {}
 
 jobs:
-  helm-validate:
-    runs-on: ubuntu-latest
-  
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 1
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v5
-
-      - name: Helm lint
-        run: make helm-lint
-
-      - name: Helm template (render test)
-        run: make helm-template
-        
+  feat-ci-push:
+    uses: ghdrope/templates-ci/.github/workflows/helm-feat_cd_push.yml@latest
+    permissions:
+      contents: read
