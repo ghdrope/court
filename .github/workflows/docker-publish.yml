@@ -11,7 +11,7 @@ permissions: {}
 
 jobs:
   docker-publish:
-    uses: ghdrope/templates-ci/.github/workflows/docker-docker_publish.yml@latest
+    uses: ghdrope/templates-ci/.github/workflows/docker-docker_publish.yml@main
     with:
       components: '["officer", "court"]'
     permissions:
