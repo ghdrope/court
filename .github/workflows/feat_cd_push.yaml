@@ -14,6 +14,6 @@ permissions: {}
 
 jobs:
   feat-ci-push:
-    uses: ghdrope/templates-ci/.github/workflows/helm-feat_cd_push.yml@latest
+    uses: ghdrope/templates-ci/.github/workflows/helm-feat_cd_push.yml@main
     permissions:
       contents: read
