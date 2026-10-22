@@ -4,7 +4,8 @@ description: Helm chart for deploying Court
 
 type: application
 
-version: 0.3.0 # Chart version (increment on ANY chart/template change)
+version: 0.4.0 # Chart version (increment on ANY chart/template change)
+# renovate: datasource=github-releases depName=ghdrope/court
 appVersion: "0.0" # Change when new minor of court
 
 keywords:
