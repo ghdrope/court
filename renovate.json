@@ -9,6 +9,34 @@
   "useBaseBranchConfig": "merge",
   "reviewers": ["ghdrope"],
   "labels": ["renovate"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Keep Helm appVersion in sync",
+      "managerFilePatterns": [
+        "/(^|/)Chart\\.yaml$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate: datasource=github-releases depName=ghdrope/court[^\\n]*\\nappVersion:\\s*[\"']?(?<currentValue>[^\"'\\s]+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "ghdrope/court",
+      "extractVersionTemplate": "^v?(?<version>\\d+\\.\\d+)",
+      "versioningTemplate": "semver-coerced"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Docker Hub images in Helm templates",
+      "managerFilePatterns": [
+        "/\\.ya?ml(?:\\.tpl)?$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate: docker-hub-image\\s*\\n[ \\t]*image:\\s*(?<depName>[^\\s]+):(?<currentValue>[^\\s#]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
   "packageRules": [
     {
       "reviewers": ["ghdrope"],
