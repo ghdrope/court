@@ -24,7 +24,7 @@ spec:
       containers:
         - name: redis
           # renovate: docker-hub-image
-          image: redis:8.10
+          image: redis:8.12
 
           ports:
             - containerPort: {{ .Values.docket.service.port }}
